@@ -1,0 +1,440 @@
+/* ─── Navbar ─── */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 6%;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(8, 13, 26, 0.88);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-heading), sans-serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.logoStar {
+  color: var(--gold);
+  font-size: 1.4rem;
+}
+
+.navLinks {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.navLinks a {
+  color: var(--text-secondary);
+  transition: color var(--transition-fast);
+}
+
+.navLinks a:hover,
+.navActive {
+  color: var(--gold-light) !important;
+}
+
+/* ─── Catalog Container ─── */
+.catalogContainer {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 4rem 6% 6rem;
+}
+
+.catalogHeader {
+  text-align: center;
+  margin-bottom: 4rem;
+}
+
+.catalogBismillah {
+  font-family: var(--font-arabic), serif;
+  font-size: 1.75rem;
+  color: var(--gold);
+  direction: rtl;
+  margin-bottom: 1rem;
+  letter-spacing: 1px;
+}
+
+.catalogTitle {
+  font-size: clamp(2rem, 4vw, 3rem);
+  margin-bottom: 0.5rem;
+}
+
+.ornamentDivider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1rem auto 1.25rem;
+  max-width: 300px;
+}
+
+.ornamentLine {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--gold-border), transparent);
+  display: block;
+}
+
+.ornamentStar {
+  color: var(--gold);
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.catalogSubtitle {
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  max-width: 600px;
+  margin: 0 auto 2rem;
+  line-height: 1.6;
+}
+
+/* ── Filters ── */
+.filterContainer {
+  max-width: 600px;
+  margin: 0 auto 3rem;
+}
+
+.searchWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 1.25rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 1rem 1rem 1rem 3.5rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-family: inherit;
+  transition: all var(--transition-normal);
+  box-shadow: var(--shadow-sm);
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--gold-border);
+  box-shadow: var(--shadow-gold);
+  background: var(--bg-primary);
+}
+
+.clearSearchBtn {
+  position: absolute;
+  right: 1.25rem;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: color var(--transition-fast);
+}
+
+.clearSearchBtn:hover {
+  color: var(--text-primary);
+}
+
+/* ─── Empty State ─── */
+.emptyState {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 5rem 2rem;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.emptyIcon {
+  font-size: 3rem;
+}
+
+/* ─── Course Grid ─── */
+.courseGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 2rem;
+}
+
+/* ─── Course Card ─── */
+.courseCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: all var(--transition-normal);
+  text-decoration: none;
+}
+
+.courseCard:hover {
+  transform: translateY(-5px);
+  border-color: var(--gold-border);
+  box-shadow: 0 8px 32px rgba(29, 132, 152, 0.18);
+}
+
+/* Thumbnail */
+.thumbnailPlaceholder {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(135deg, var(--bg-tertiary) 0%, rgba(30, 158, 110, 0.15) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.thumbnailImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumbnailIcon {
+  font-size: 2.5rem;
+  z-index: 1;
+}
+
+.thumbnailOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 60%, rgba(8, 13, 26, 0.6) 100%);
+}
+
+/* Card top gold stripe on hover */
+.courseCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--gold), var(--accent-primary));
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+  z-index: 2;
+}
+
+.courseCard:hover::before {
+  opacity: 1;
+}
+
+/* Course Content */
+.courseContent {
+  padding: 1.5rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.courseTitle {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+}
+
+.courseDescription {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.65;
+  margin-bottom: 1.5rem;
+  flex: 1;
+}
+
+/* Footer */
+.courseFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.instructorInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.instructorAvatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--gold-border);
+  overflow: hidden;
+}
+
+.instructorAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.instructorName {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.viewLabel {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--gold);
+  transition: color var(--transition-fast);
+}
+
+.courseCard:hover .viewLabel {
+  color: var(--gold-light);
+}
+
+/* ─── Course Detail Page ─── */
+.courseDetailContainer {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 4rem 6%;
+}
+
+.courseHeader {
+  margin-bottom: 3rem;
+  text-align: center;
+}
+
+.enrollButton {
+  display: inline-block;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
+  color: var(--bg-primary) !important;
+  padding: 1rem 2.5rem;
+  border-radius: var(--radius-full);
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin-top: 2rem;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-gold);
+}
+
+.enrollButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(29, 132, 152, 0.45);
+}
+
+.curriculumSection {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 2.5rem;
+}
+
+.curriculumTitle {
+  color: var(--gold-light);
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.moduleItem {
+  margin-bottom: 1.75rem;
+}
+
+.moduleTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.lessonList {
+  list-style: none;
+  padding-left: 1.5rem;
+  border-left: 2px solid var(--gold-border);
+  margin-left: 0.5rem;
+}
+
+.lessonItem {
+  padding: 0.5rem 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  position: relative;
+}
+
+.lessonItem::before {
+  content: '';
+  position: absolute;
+  left: -1.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 1px;
+  background: var(--gold-border);
+}
+
+/* ─── Footer ─── */
+.footer {
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  padding: 3rem 6%;
+  text-align: center;
+}
+
+.footerArabic {
+  font-family: var(--font-arabic), serif;
+  font-size: 1.5rem;
+  color: var(--gold);
+  direction: rtl;
+  margin-bottom: 0.5rem;
+}
+
+.footerTranslation {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-style: italic;
+  margin-bottom: 0.5rem;
+}
+
+.footerCopy {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .courseGrid {
+    grid-template-columns: 1fr;
+  }
+}
