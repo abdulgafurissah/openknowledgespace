@@ -7,40 +7,18 @@ import { courses, userProgress } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 
 export default async function DashboardOverview() {
-  try {
-    const session = await auth();
-    if (!session?.user) {
-      redirect('/login');
-    }
+  const session = await auth();
+  if (!session?.user) {
+    redirect('/login');
+  }
 
-    const role = session.user.role || 'STUDENT';
-    const isInstructor = role === 'INSTRUCTOR' || role === 'ADMIN';
+  const role = session.user.role || 'STUDENT';
+  const isInstructor = role === 'INSTRUCTOR' || role === 'ADMIN';
 
-    if (isInstructor) {
-      return <InstructorDashboard userId={session.user.id!} />;
-    } else {
-      return <StudentDashboard userId={session.user.id!} />;
-    }
-  } catch (error: any) {
-    // DIAGNOSTIC CATCH: Prevent digest hash and print the real error to the screen
-    console.error("DASHBOARD RENDER ERROR:", error);
-    
-    // If it's a redirect error from next/navigation, we must rethrow it so Next.js handles the redirect
-    if (error?.message === 'NEXT_REDIRECT') {
-      throw error;
-    }
-
-    return (
-      <div style={{ padding: '2rem', background: '#2a0a0a', color: '#ffaaaa', borderRadius: '8px', border: '1px solid #ff0000', margin: '2rem' }}>
-        <h2 style={{ color: '#ff5555' }}>🚨 Critical Server Error</h2>
-        <p>The dashboard crashed while loading on the server. Please copy the text below and send it to your AI:</p>
-        <pre style={{ background: '#111', padding: '1rem', overflowX: 'auto', marginTop: '1rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-          {error.message || String(error)}
-          {'\n\nStack Trace:\n'}
-          {error.stack || 'No stack trace available'}
-        </pre>
-      </div>
-    );
+  if (isInstructor) {
+    return <InstructorDashboard userId={session.user.id!} />;
+  } else {
+    return <StudentDashboard userId={session.user.id!} />;
   }
 }
 
