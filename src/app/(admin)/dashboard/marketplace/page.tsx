@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+
 import DriveUploader, { DriveUploadResult } from '@/components/DriveUploader';
 import styles from '../../admin.module.css';
 
@@ -28,7 +29,7 @@ const FILE_TYPE_LABELS: Record<string, string> = {
 };
 
 export default function AdminMarketplacePage() {
-  const router = useRouter();
+
   const [items, setItems] = useState<MarketplaceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
