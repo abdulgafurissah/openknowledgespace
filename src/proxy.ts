@@ -5,12 +5,14 @@ export default auth((req) => {
   const isLoggedIn = !!req.auth
   const { pathname } = req.nextUrl
 
+  // Redirect unauthenticated users away from dashboard
   if (pathname.startsWith('/dashboard') && !isLoggedIn) {
     const loginUrl = req.nextUrl.clone()
     loginUrl.pathname = '/login'
     return NextResponse.redirect(loginUrl)
   }
 
+  // Redirect already-logged-in users away from login page
   if (pathname === '/login' && isLoggedIn) {
     const dashUrl = req.nextUrl.clone()
     dashUrl.pathname = '/dashboard'

@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import DriveUploader, { DriveUploadResult } from '@/components/DriveUploader';
-import styles from '../../../admin.module.css';
+import styles from '../../admin.module.css';
 
 interface MarketplaceItem {
   id: string;
