@@ -1,4 +1,4 @@
-/* Fonts are loaded via Next.js font system in layout.tsx (DM Serif Display + DM Sans + Amiri) */
+/* Fonts loaded via <link> tags in layout.tsx (DM Serif Display + DM Sans + Amiri) */
 
 :root {
   --bg-primary:    #0a1424;
@@ -45,6 +45,7 @@
   --transition-slow:   450ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-spring: 350ms cubic-bezier(0.34, 1.56, 0.64, 1);
 
+  /* Font families — loaded via Google Fonts <link> in layout.tsx */
   --font-arabic:   'Amiri', serif;
   --font-body:     'DM Sans', sans-serif;
   --font-heading:  'DM Serif Display', serif;

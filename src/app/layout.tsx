@@ -1,29 +1,5 @@
 import type { Metadata } from "next";
-import { DM_Serif_Display, DM_Sans, Amiri } from "next/font/google";
 import "./globals.css";
-
-const dmSerifDisplay = DM_Serif_Display({
-  variable: "--font-heading",
-  subsets: ["latin"],
-  weight: ["400"],
-  style: ["normal", "italic"],
-  display: "swap",
-});
-
-const dmSans = DM_Sans({
-  variable: "--font-body",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  display: "swap",
-});
-
-const amiri = Amiri({
-  variable: "--font-arabic",
-  subsets: ["arabic", "latin"],
-  weight: ["400", "700"],
-  style: ["normal", "italic"],
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "Open Knowledge Space | Islamic Learning Platform",
@@ -37,9 +13,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${dmSerifDisplay.variable} ${dmSans.variable} ${amiri.variable}`}>
+    <html lang="en">
+      <head>
+        {/* Google Fonts — loaded via link for Turbopack compatibility */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Serif+Display:ital@0;1&family=Amiri:ital,wght@0,400;0,700;1,400;1,700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }
-
