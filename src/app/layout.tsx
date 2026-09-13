@@ -5,6 +5,13 @@ export const metadata: Metadata = {
   title: "Open Knowledge Space | Islamic Learning Platform",
   description: "A structured Islamic e-learning platform offering courses in Quran, Islamic studies, Arabic, and more. Free access for all learners.",
   keywords: ["Islamic learning", "Quran", "Arabic", "Islamic studies", "online courses"],
+  icons: {
+    icon: [
+      { url: "/logo.png", type: "image/png" },
+    ],
+    apple: "/logo.png",
+    shortcut: "/logo.png",
+  },
 };
 
 export default function RootLayout({
@@ -15,6 +22,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* Favicon — your logo */}
+        <link rel="icon" href="/logo.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="shortcut icon" href="/logo.png" type="image/png" />
+
         {/* Google Fonts — loaded via link for Turbopack compatibility */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
