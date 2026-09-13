@@ -41,14 +41,14 @@ export async function uploadVideoToGumlet(
   sourceUrl: string,
   title: string
 ): Promise<GumletUploadResult> {
-  const collectionId = process.env.GUMLET_COLLECTION_ID;
-  if (!collectionId) throw new Error('GUMLET_COLLECTION_ID is not set');
+  const workspaceId = process.env.GUMLET_WORKSPACE_ID;
+  if (!workspaceId) throw new Error('GUMLET_WORKSPACE_ID is not set');
 
   const response = await fetch(`${GUMLET_API_BASE}/video/assets`, {
     method: 'POST',
     headers: getHeaders(),
     body: JSON.stringify({
-      collection_id: collectionId,
+      workspace_id: workspaceId,
       source_url: sourceUrl,
       title,
     }),
@@ -63,7 +63,7 @@ export async function uploadVideoToGumlet(
 
   return {
     assetId: data.asset_id,
-    collectionId: data.collection_id,
+    collectionId: data.workspace_id,
     status: data.status,
     playbackUrl: buildPlaybackUrl(data.asset_id),
     embedUrl: buildEmbedUrl(data.asset_id),
@@ -82,14 +82,14 @@ export async function createGumletUploadUrl(title: string): Promise<{
   embedUrl: string;
   playbackUrl: string;
 }> {
-  const collectionId = process.env.GUMLET_COLLECTION_ID;
-  if (!collectionId) throw new Error('GUMLET_COLLECTION_ID is not set');
+  const workspaceId = process.env.GUMLET_WORKSPACE_ID;
+  if (!workspaceId) throw new Error('GUMLET_WORKSPACE_ID is not set');
 
   const response = await fetch(`${GUMLET_API_BASE}/video/assets/upload`, {
     method: 'POST',
     headers: getHeaders(),
     body: JSON.stringify({
-      collection_id: collectionId,
+      workspace_id: workspaceId,
       title,
       format: 'mp4',
     }),
