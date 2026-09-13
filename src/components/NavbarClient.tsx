@@ -47,6 +47,7 @@ export default function NavbarClient({ user }: NavbarClientProps) {
         <div className={styles.navLinks}>
           <Link href="/courses">Courses</Link>
           <Link href="/marketplace">Marketplace</Link>
+          <Link href="/blog">Blog</Link>
           {user ? (
             <>
               <Link href="/dashboard" className={styles.navSecondary}>
@@ -96,6 +97,9 @@ export default function NavbarClient({ user }: NavbarClientProps) {
             </Link>
             <Link href="/marketplace" className={styles.drawerLink} onClick={() => setMenuOpen(false)}>
               <span>🛍️</span> Marketplace
+            </Link>
+            <Link href="/blog" className={styles.drawerLink} onClick={() => setMenuOpen(false)}>
+              <span>📰</span> Blog
             </Link>
             {user ? (
               <>
