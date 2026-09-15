@@ -69,6 +69,10 @@ export default function AdminMarketplacePage() {
       setError('Please upload a file first.');
       return;
     }
+    if (!thumbResult) {
+      setError('Please upload a thumbnail image.');
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
@@ -319,7 +323,7 @@ export default function AdminMarketplacePage() {
             {/* Thumbnail Upload */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                Thumbnail Image (optional)
+                Thumbnail Image *
               </label>
               <DriveUploader
                 accept="image/*"
@@ -348,7 +352,7 @@ export default function AdminMarketplacePage() {
               </button>
               <button
                 type="submit"
-                disabled={submitting || !title || !fileResult}
+                disabled={submitting || !title || !fileResult || !thumbResult}
                 className={styles.primaryAction}
                 id="submit-marketplace-item"
               >

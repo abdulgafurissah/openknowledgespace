@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import DriveUploader, { DriveUploadResult } from "@/components/DriveUploader";
 import styles from "../../../admin.module.css";
 import formStyles from "./form.module.css";
 
@@ -9,6 +10,7 @@ export default function CreateCourse() {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [thumbResult, setThumbResult] = useState<DriveUploadResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,10 +20,21 @@ export default function CreateCourse() {
     setError(null);
 
     try {
+      if (!thumbResult) {
+        setError("Please upload a thumbnail image.");
+        setLoading(false);
+        return;
+      }
+
       const res = await fetch('/api/courses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description }),
+        body: JSON.stringify({ 
+          title, 
+          description,
+          thumbnailUrl: thumbResult.viewUrl,
+          thumbnailDriveId: thumbResult.fileId
+        }),
       });
 
       const data = await res.json();
@@ -76,6 +89,16 @@ export default function CreateCourse() {
             />
           </div>
 
+          <div className={formStyles.formGroup}>
+            <label>Course Thumbnail *</label>
+            <DriveUploader
+              accept="image/*"
+              label="Upload a thumbnail for the course catalog"
+              onUploadComplete={result => setThumbResult(result)}
+              maxSizeMB={5}
+            />
+          </div>
+
           <div className={formStyles.formActions}>
             <button 
               type="button" 
@@ -87,7 +110,7 @@ export default function CreateCourse() {
             <button 
               type="submit" 
               className={styles.primaryAction}
-              disabled={loading || !title}
+              disabled={loading || !title || !thumbResult}
             >
               {loading ? "Creating..." : "Create Course"}
             </button>
