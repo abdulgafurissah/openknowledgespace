@@ -6,7 +6,7 @@ interface MarketplaceItem {
   id: string;
   title: string;
   description: string | null;
-  fileType: 'ebook' | 'apk' | 'document' | 'other';
+  fileType: 'ebook' | 'apk' | 'document' | 'other' | 'merch' | 'garment';
   price: string;
   isFree: boolean;
   downloadUrl: string | null;
@@ -49,6 +49,8 @@ const FILE_TYPE_LABELS: Record<string, string> = {
   apk: '📱 Android App',
   document: '📄 Document',
   other: '📦 Resource',
+  merch: '👕 Merchandise',
+  garment: '👗 Islamic Garment',
 };
 
 function formatSize(bytes: string | null): string {
@@ -281,7 +283,22 @@ export default async function MarketplaceItemPage({
 
             {/* Download / Price CTA */}
             <div className="item-download-section">
-              {item.isFree && item.downloadUrl ? (
+              {(item.fileType === 'merch' || item.fileType === 'garment') ? (
+                <>
+                  <span className="item-price-tag">
+                    {item.isFree ? 'Free' : `$${parseFloat(item.price).toFixed(2)}`}
+                  </span>
+                  <a
+                    href={item.downloadUrl || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-download btn-paid"
+                    style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+                  >
+                    Contact to Purchase
+                  </a>
+                </>
+              ) : item.isFree && item.downloadUrl ? (
                 <a
                   href={item.downloadUrl}
                   target="_blank"

@@ -65,8 +65,8 @@ export const marketplaceItems = pgTable('marketplace_items', {
   id: uuid('id').defaultRandom().primaryKey(),
   title: text('title').notNull(),
   description: text('description'),
-  // 'ebook' | 'apk' | 'document' | 'other'
-  fileType: text('file_type', { enum: ['ebook', 'apk', 'document', 'other'] }).notNull(),
+  // 'ebook' | 'apk' | 'document' | 'other' | 'merch' | 'garment'
+  fileType: text('file_type', { enum: ['ebook', 'apk', 'document', 'other', 'merch', 'garment'] }).notNull(),
   price: numeric('price', { precision: 10, scale: 2 }).default('0').notNull(),
   isFree: boolean('is_free').default(true).notNull(),
   // Google Drive storage
@@ -93,12 +93,35 @@ export const purchases = pgTable('purchases', {
   purchasedAt: timestamp('purchased_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ─── Events ───────────────────────────────────────────────────────────────────
+
+export const events = pgTable('events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  title: text('title').notNull(),
+  description: text('description'),
+  eventDate: timestamp('event_date', { withTimezone: true }),
+  
+  // Banner image stored on Google Drive
+  bannerUrl: text('banner_url'),
+  bannerDriveId: text('banner_drive_id'),
+  
+  // Google form embed URL (src in the iframe)
+  googleFormUrl: text('google_form_url'),
+  
+  isPublished: boolean('is_published').default(false).notNull(),
+  organizerId: uuid('organizer_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   courses: many(courses),
   userProgress: many(userProgress),
   marketplaceItems: many(marketplaceItems),
   purchases: many(purchases),
+  events: many(events),
 }));
 
 export const coursesRelations = relations(courses, ({ one, many }) => ({
@@ -154,3 +177,11 @@ export const purchasesRelations = relations(purchases, ({ one }) => ({
     references: [marketplaceItems.id],
   }),
 }));
+
+export const eventsRelations = relations(events, ({ one }) => ({
+  organizer: one(users, {
+    fields: [events.organizerId],
+    references: [users.id],
+  }),
+}));
+

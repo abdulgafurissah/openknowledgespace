@@ -37,6 +37,8 @@ const FILE_TYPE_LABELS: Record<string, string> = {
   apk: '📱 Android App',
   document: '📄 Document',
   other: '📦 Resource',
+  merch: '👕 Merchandise',
+  garment: '👗 Islamic Garment',
 };
 
 const FILE_TYPE_COLORS: Record<string, string> = {
@@ -64,6 +66,8 @@ export default async function MarketplacePage({
     { label: '📱 Apps (APK)', value: 'apk' },
     { label: '📄 Documents', value: 'document' },
     { label: '📦 Other', value: 'other' },
+    { label: '👕 Merch', value: 'merch' },
+    { label: '👗 Garments', value: 'garment' },
   ];
 
   return (

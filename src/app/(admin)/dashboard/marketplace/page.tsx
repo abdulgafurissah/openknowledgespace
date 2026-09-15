@@ -26,6 +26,8 @@ const FILE_TYPE_LABELS: Record<string, string> = {
   apk: '📱 Android App (APK)',
   document: '📄 Document',
   other: '📦 Other',
+  merch: '👕 Merchandise',
+  garment: '👗 Islamic Garment',
 };
 
 export default function AdminMarketplacePage() {
@@ -39,7 +41,7 @@ export default function AdminMarketplacePage() {
   // Form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [fileType, setFileType] = useState<'ebook' | 'apk' | 'document' | 'other'>('ebook');
+  const [fileType, setFileType] = useState<'ebook' | 'apk' | 'document' | 'other' | 'merch' | 'garment'>('ebook');
   const [isFree, setIsFree] = useState(true);
   const [price, setPrice] = useState('0');
   const [fileResult, setFileResult] = useState<DriveUploadResult | null>(null);

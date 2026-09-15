@@ -46,6 +46,7 @@ export default function NavbarClient({ user }: NavbarClientProps) {
         {/* Desktop nav links */}
         <div className={styles.navLinks}>
           <Link href="/courses">Courses</Link>
+          <Link href="/events">Events</Link>
           <Link href="/marketplace">Marketplace</Link>
           <Link href="/blog">Blog</Link>
           {user ? (
@@ -94,6 +95,9 @@ export default function NavbarClient({ user }: NavbarClientProps) {
           <nav className={styles.drawerNav}>
             <Link href="/courses" className={styles.drawerLink} onClick={() => setMenuOpen(false)}>
               <span>📖</span> Courses
+            </Link>
+            <Link href="/events" className={styles.drawerLink} onClick={() => setMenuOpen(false)}>
+              <span>📅</span> Events
             </Link>
             <Link href="/marketplace" className={styles.drawerLink} onClick={() => setMenuOpen(false)}>
               <span>🛍️</span> Marketplace

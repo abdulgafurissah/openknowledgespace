@@ -5,6 +5,7 @@ import { courses as coursesTable } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import styles from "./page.module.css";
 import Navbar from "@/components/Navbar";
+import HomeHeroSlider, { SlideData } from "@/components/HomeHeroSlider";
 
 export default async function Home() {
   // Fetch a few featured courses for the homepage
@@ -19,97 +20,58 @@ export default async function Home() {
   .orderBy(desc(coursesTable.createdAt))
   .limit(3);
 
+  // Fetch latest event
+  const latestEvents = await db.query.events.findMany({
+    where: eq(db._.fullSchema.events.isPublished, true),
+    orderBy: [desc(db._.fullSchema.events.eventDate)],
+    limit: 1,
+  });
+
+  const latestEvent = latestEvents[0];
+  const latestCourse = courses[0];
+
+  const slides: SlideData[] = [
+    {
+      type: 'default',
+      title: 'Seek Knowledge &\nIlluminate Your Heart',
+      description: 'A structured Islamic learning platform offering courses in Quran, Arabic, Fiqh, Aqeedah, and more — completely free for every seeker of knowledge.',
+      ctaText: 'Explore Courses',
+      ctaLink: '/courses',
+    }
+  ];
+
+  if (latestCourse) {
+    slides.push({
+      type: 'course',
+      badge: '✨ New Course',
+      title: latestCourse.title,
+      description: latestCourse.description || 'Join our latest course to expand your knowledge.',
+      ctaText: 'Begin Learning',
+      ctaLink: `/courses/${latestCourse.id}`,
+      imageUrl: latestCourse.thumbnailUrl,
+    });
+  }
+
+  if (latestEvent) {
+    slides.push({
+      type: 'event',
+      badge: '📅 Upcoming Event',
+      title: latestEvent.title,
+      description: latestEvent.description || 'Don\'t miss our upcoming event. Register now!',
+      ctaText: 'Register Now',
+      ctaLink: `/events/${latestEvent.id}`,
+      imageUrl: latestEvent.bannerUrl,
+    });
+  }
+
   return (
     <div className={styles.container}>
       {/* ── Navbar ── */}
       <Navbar />
 
       <main className={styles.main}>
-        {/* ── Hero Section ── */}
-        <section className={styles.hero}>
-          <div className={styles.heroBg} aria-hidden="true">
-            <div className={styles.heroBgOrb1} />
-            <div className={styles.heroBgOrb2} />
-          </div>
-
-          <div className={styles.heroContent}>
-            {/* Arabic Bismillah */}
-            <p className={styles.bismillah} lang="ar">
-              بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
-            </p>
-
-            <div className={styles.ornamentDivider} aria-hidden="true">
-              <span className={styles.ornamentLine} />
-              <span className={styles.ornamentStar}>✦</span>
-              <span className={styles.ornamentLine} />
-            </div>
-
-            <h1 className={`${styles.heroTitle} gradient-text`}>
-              Seek Knowledge &<br />Illuminate Your Heart
-            </h1>
-            <p className={styles.heroSubtitle}>
-              A structured Islamic learning platform offering courses in Quran, Arabic,
-              Fiqh, Aqeedah, and more — completely free for every seeker of knowledge.
-            </p>
-
-            <div className={styles.hadithQuote}>
-              <span className={styles.quoteIcon}>❝</span>
-              <p>
-                <em>
-                  &ldquo;Seeking knowledge is an obligation upon every Muslim.&rdquo;
-                </em>
-              </p>
-              <span className={styles.hadithSource}>— Sunan Ibn Mājah</span>
-            </div>
-
-            <div className={styles.ctaGroup}>
-              <Link href="/courses" className={styles.primaryCta}>
-                Explore Courses
-              </Link>
-              <Link href="#subjects" className={styles.secondaryCta}>
-                View Subjects ↓
-              </Link>
-            </div>
-          </div>
-
-          {/* Decorative geometric card */}
-          <div className={styles.heroVisual} aria-hidden="true">
-            <div className={styles.geometricFrame}>
-              <div className={styles.starOuter}>
-                <svg viewBox="0 0 200 200" className={styles.starSvg}>
-                  <polygon
-                    points="100,10 118,65 175,65 129,100 147,155 100,120 53,155 71,100 25,65 82,65"
-                    fill="none"
-                    stroke="rgba(201,168,76,0.4)"
-                    strokeWidth="1.5"
-                  />
-                  <polygon
-                    points="100,30 113,72 157,72 122,97 135,139 100,115 65,139 78,97 43,72 87,72"
-                    fill="none"
-                    stroke="rgba(201,168,76,0.2)"
-                    strokeWidth="1"
-                  />
-                  <circle cx="100" cy="100" r="40" fill="none" stroke="rgba(201,168,76,0.3)" strokeWidth="1" />
-                  <circle cx="100" cy="100" r="6" fill="rgba(201,168,76,0.6)" />
-                </svg>
-              </div>
-              <div className={styles.statsCards}>
-                <div className={styles.statCard}>
-                  <span className={styles.statNumber}>∞</span>
-                  <span className={styles.statLabel}>Free Access</span>
-                </div>
-                <div className={styles.statCard}>
-                  <span className={styles.statNumber}>📖</span>
-                  <span className={styles.statLabel}>Quran & Sunnah</span>
-                </div>
-                <div className={styles.statCard}>
-                  <span className={styles.statNumber}>🌙</span>
-                  <span className={styles.statLabel}>Daily Lessons</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+        {/* ── Hero Slider Section ── */}
+        <HomeHeroSlider slides={slides} />
 
         {/* ── Subjects Section ── */}
         <section className={styles.subjects} id="subjects">
