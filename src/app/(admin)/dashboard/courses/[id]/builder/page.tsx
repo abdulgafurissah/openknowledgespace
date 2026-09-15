@@ -4,19 +4,14 @@ import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../../../../admin.module.css";
 import formStyles from "../../new/form.module.css";
-
-interface Lesson {
-  id: string;
-  title: string;
-  videoUrl: string | null;
-  orderIndex: number;
-}
+import builderStyles from "./builder.module.css";
+import LessonEditorPanel, { LessonData } from "./LessonEditorPanel";
 
 interface Module {
   id: string;
   title: string;
   orderIndex: number;
-  lessons: Lesson[];
+  lessons: LessonData[];
 }
 
 interface Course {
@@ -24,6 +19,11 @@ interface Course {
   title: string;
   isPublished: boolean;
 }
+
+type PanelState =
+  | { type: "none" }
+  | { type: "add"; moduleId: string }
+  | { type: "edit"; moduleId: string; lesson: LessonData };
 
 export default function CourseBuilder({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -33,6 +33,7 @@ export default function CourseBuilder({ params }: { params: Promise<{ id: string
   const [modules, setModules] = useState<Module[]>([]);
   const [newModuleName, setNewModuleName] = useState("");
   const [loading, setLoading] = useState(true);
+  const [panel, setPanel] = useState<PanelState>({ type: "none" });
 
   useEffect(() => {
     let active = true;
@@ -46,21 +47,17 @@ export default function CourseBuilder({ params }: { params: Promise<{ id: string
       }
     }
     loadData();
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [courseId]);
 
+  // ── Module actions ──────────────────────────────────────────────────────────
   const addModule = async () => {
-    if (!newModuleName) return;
-    const newOrderIndex = modules.length;
-
+    if (!newModuleName.trim()) return;
     const res = await fetch(`/api/courses/${courseId}/modules`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: newModuleName, orderIndex: newOrderIndex }),
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: newModuleName.trim(), orderIndex: modules.length }),
     });
-
     if (res.ok) {
       const data = await res.json();
       setModules([...modules, { ...data, lessons: [] }]);
@@ -69,82 +66,40 @@ export default function CourseBuilder({ params }: { params: Promise<{ id: string
   };
 
   const deleteModule = async (moduleId: string) => {
-    if (!confirm("Are you sure you want to delete this module and all its lessons?")) return;
-
-    const res = await fetch(`/api/courses/${courseId}/modules?moduleId=${moduleId}`, {
-      method: 'DELETE',
-    });
-
-    if (res.ok) {
-      setModules(modules.filter(m => m.id !== moduleId));
-    }
+    if (!confirm("Delete this module and all its lessons?")) return;
+    const res = await fetch(`/api/courses/${courseId}/modules?moduleId=${moduleId}`, { method: "DELETE" });
+    if (res.ok) setModules(modules.filter((m) => m.id !== moduleId));
   };
 
-  const [addingLessonToModule, setAddingLessonToModule] = useState<string | null>(null);
-  const [newLessonTitle, setNewLessonTitle] = useState("");
-  const [newLessonUrl, setNewLessonUrl] = useState("");
-
-  const handleAddLessonSubmit = async (moduleId: string) => {
-    if (!newLessonTitle || !newLessonUrl) return;
-
-    // Extract YouTube video ID from URL
-    let youtubeId = newLessonUrl;
-    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
-    const match = newLessonUrl.match(regex);
-    if (match && match[1]) {
-      youtubeId = match[1];
-    }
-
-    const mod = modules.find(m => m.id === moduleId);
-    if (!mod) return;
-
-    const res = await fetch(`/api/courses/${courseId}/lessons`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        moduleId,
-        title: newLessonTitle,
-        videoUrl: youtubeId,
-        orderIndex: mod.lessons.length,
-      }),
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      setModules(modules.map(m => {
-        if (m.id === moduleId) {
-          return { ...m, lessons: [...m.lessons, data] };
+  // ── Lesson actions ──────────────────────────────────────────────────────────
+  const handleLessonSaved = (moduleId: string, lesson: LessonData) => {
+    setModules((prev) =>
+      prev.map((m) => {
+        if (m.id !== moduleId) return m;
+        const existing = m.lessons.find((l) => l.id === lesson.id);
+        if (existing) {
+          return { ...m, lessons: m.lessons.map((l) => (l.id === lesson.id ? lesson : l)) };
         }
-        return m;
-      }));
-      setAddingLessonToModule(null);
-      setNewLessonTitle("");
-      setNewLessonUrl("");
-    }
+        return { ...m, lessons: [...m.lessons, lesson] };
+      })
+    );
+    setPanel({ type: "none" });
   };
 
   const deleteLesson = async (moduleId: string, lessonId: string) => {
-    if (!confirm("Are you sure you want to delete this lesson?")) return;
-
-    const res = await fetch(`/api/courses/${courseId}/lessons?lessonId=${lessonId}`, {
-      method: 'DELETE',
-    });
-
+    if (!confirm("Delete this lesson?")) return;
+    const res = await fetch(`/api/courses/${courseId}/lessons?lessonId=${lessonId}`, { method: "DELETE" });
     if (res.ok) {
-      setModules(modules.map(m => {
-        if (m.id === moduleId) {
-          return { ...m, lessons: m.lessons.filter(l => l.id !== lessonId) };
-        }
-        return m;
-      }));
+      setModules((prev) =>
+        prev.map((m) =>
+          m.id === moduleId ? { ...m, lessons: m.lessons.filter((l) => l.id !== lessonId) } : m
+        )
+      );
     }
   };
 
   const publishCourse = async () => {
-    const res = await fetch(`/api/courses/${courseId}/lessons`, {
-      method: 'PATCH',
-    });
-
+    const res = await fetch(`/api/courses/${courseId}/lessons`, { method: "PATCH" });
     if (res.ok) {
       alert("Course published successfully!");
       router.push("/dashboard/courses");
@@ -152,21 +107,26 @@ export default function CourseBuilder({ params }: { params: Promise<{ id: string
   };
 
   if (loading) {
-    return <div style={{ padding: '2rem' }}>Loading course data...</div>;
+    return (
+      <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-muted)" }}>
+        Loading course…
+      </div>
+    );
   }
 
   return (
     <>
+      {/* ── Page Header ── */}
       <div className={styles.pageHeader}>
         <div>
           <h1 className={styles.pageTitle}>Curriculum: {course?.title}</h1>
-          <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-            Structure your course by adding modules and YouTube lessons. Changes are saved automatically.
+          <p style={{ color: "var(--text-secondary)", marginTop: "0.5rem", fontSize: "0.9rem" }}>
+            Add modules and lessons. Each lesson supports YouTube, cloud video, transcript and file attachments.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div style={{ display: "flex", gap: "1rem" }}>
           <button className={formStyles.secondaryButton} onClick={() => router.push("/dashboard/courses")}>
-            Back to Courses
+            ← Back
           </button>
           {!course?.isPublished && (
             <button className={styles.primaryAction} onClick={publishCourse}>
@@ -177,107 +137,133 @@ export default function CourseBuilder({ params }: { params: Promise<{ id: string
       </div>
 
       <div className={formStyles.builderSection}>
-        {modules.map((mod, index) => (
+        {/* ── Module List ── */}
+        {modules.map((mod, mIdx) => (
           <div key={mod.id} className={formStyles.moduleCard}>
+            {/* Module Header */}
             <div className={formStyles.moduleHeader}>
               <div className={formStyles.moduleTitle}>
-                Module {index + 1}: {mod.title}
+                Module {mIdx + 1}: {mod.title}
               </div>
-              <button 
-                className={formStyles.secondaryButton} 
-                style={{ padding: '0.25rem 0.5rem', color: '#ef4444', borderColor: '#ef4444' }}
+              <button
+                className={formStyles.secondaryButton}
+                style={{ padding: "0.25rem 0.6rem", color: "#ef4444", borderColor: "#ef4444", fontSize: "0.8rem" }}
                 onClick={() => deleteModule(mod.id)}
-                title="Delete Module"
               >
-                Delete
+                Delete Module
               </button>
             </div>
-            
+
+            {/* Lesson List */}
             <div className={formStyles.lessonList}>
-              {mod.lessons.map((lesson, lIndex) => (
-                <div key={lesson.id} className={formStyles.lessonItem}>
-                  <div style={{ flex: 1 }}>
-                    <div>
-                      <strong>Lesson {lIndex + 1}:</strong> {lesson.title}
+              {mod.lessons.map((lesson, lIdx) => {
+                const hasYoutube = !!lesson.videoUrl;
+                const hasGumlet = !!lesson.gumletAssetId;
+                const hasContent = !!lesson.content;
+                const hasFile = !!lesson.driveFileName;
+
+                return (
+                  <div key={lesson.id} className={builderStyles.lessonRow}>
+                    <div className={builderStyles.lessonInfo}>
+                      <span className={builderStyles.lessonNum}>
+                        {mIdx + 1}.{lIdx + 1}
+                      </span>
+                      <div>
+                        <div className={builderStyles.lessonTitle}>{lesson.title}</div>
+                        <div className={builderStyles.lessonBadges}>
+                          {hasYoutube && (
+                            <span className={`${builderStyles.badge} ${builderStyles.badgeYt}`}>
+                              🎬 YouTube
+                            </span>
+                          )}
+                          {hasGumlet && (
+                            <span className={`${builderStyles.badge} ${builderStyles.badgeCloud}`}>
+                              ☁️ Cloud Video
+                            </span>
+                          )}
+                          {!hasYoutube && !hasGumlet && (
+                            <span className={`${builderStyles.badge} ${builderStyles.badgeEmpty}`}>
+                              No video
+                            </span>
+                          )}
+                          {hasContent && (
+                            <span className={`${builderStyles.badge} ${builderStyles.badgeContent}`}>
+                              ✍️ Transcript
+                            </span>
+                          )}
+                          {hasFile && (
+                            <span className={`${builderStyles.badge} ${builderStyles.badgeFile}`}>
+                              📎 {lesson.driveFileName}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div className={formStyles.youtubeLink}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
-                      </svg>
-                      {lesson.videoUrl}
+
+                    <div className={builderStyles.lessonActions}>
+                      <button
+                        className={builderStyles.editBtn}
+                        onClick={() => {
+                          setPanel({ type: "edit", moduleId: mod.id, lesson });
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className={builderStyles.deleteBtn}
+                        onClick={() => deleteLesson(mod.id, lesson.id!)}
+                      >
+                        ×
+                      </button>
                     </div>
                   </div>
-                  <button 
-                    style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.5rem' }}
-                    onClick={() => deleteLesson(mod.id, lesson.id)}
-                    title="Delete Lesson"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
-            
-            {addingLessonToModule === mod.id ? (
-              <div className={formStyles.formGroup} style={{ marginTop: '1rem', padding: '1rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)' }}>
-                <input 
-                  type="text" 
-                  placeholder="Lesson Title" 
-                  value={newLessonTitle}
-                  onChange={(e) => setNewLessonTitle(e.target.value)}
-                  style={{ marginBottom: '0.5rem' }}
-                />
-                <input 
-                  type="text" 
-                  placeholder="YouTube URL" 
-                  value={newLessonUrl}
-                  onChange={(e) => setNewLessonUrl(e.target.value)}
-                />
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <button 
-                    className={styles.primaryAction} 
-                    style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
-                    onClick={() => handleAddLessonSubmit(mod.id)}
-                  >
-                    Save Lesson
-                  </button>
-                  <button 
-                    className={formStyles.secondaryButton} 
-                    style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
-                    onClick={() => setAddingLessonToModule(null)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
+
+            {/* Add / Edit Lesson Panel */}
+            {panel.type !== "none" && (
+              (panel.type === "add" && panel.moduleId === mod.id) ||
+              (panel.type === "edit" && panel.moduleId === mod.id)
+            ) ? (
+              <LessonEditorPanel
+                courseId={courseId}
+                moduleId={mod.id}
+                orderIndex={mod.lessons.length}
+                existingLesson={panel.type === "edit" ? panel.lesson : undefined}
+                onSave={(lesson) => handleLessonSaved(mod.id, lesson)}
+                onCancel={() => setPanel({ type: "none" })}
+              />
             ) : (
-              <button 
+              <button
                 className={formStyles.addLessonBtn}
-                onClick={() => {
-                  setAddingLessonToModule(mod.id);
-                  setNewLessonTitle("");
-                  setNewLessonUrl("");
-                }}
+                onClick={() => setPanel({ type: "add", moduleId: mod.id })}
+                disabled={panel.type !== "none"}
               >
-                + Add Video Lesson
+                + Add Lesson
               </button>
             )}
           </div>
         ))}
 
-        <div className={formStyles.moduleCard} style={{ background: 'transparent', borderStyle: 'dashed' }}>
-          <div className={formStyles.formGroup} style={{ flexDirection: 'row', alignItems: 'center', gap: '1rem' }}>
-            <input 
-              type="text" 
-              placeholder="New Module Name..." 
+        {/* ── Add Module ── */}
+        <div className={formStyles.moduleCard} style={{ background: "transparent", borderStyle: "dashed" }}>
+          <div
+            className={formStyles.formGroup}
+            style={{ flexDirection: "row", alignItems: "center", gap: "1rem" }}
+          >
+            <input
+              type="text"
+              placeholder="New Module Name…"
               value={newModuleName}
               onChange={(e) => setNewModuleName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") addModule(); }}
               style={{ flex: 1 }}
             />
-            <button 
-              className={styles.primaryAction} 
+            <button
+              className={styles.primaryAction}
               onClick={addModule}
-              disabled={!newModuleName}
+              disabled={!newModuleName.trim()}
             >
               Add Module
             </button>

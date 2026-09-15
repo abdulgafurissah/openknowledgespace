@@ -17,7 +17,7 @@ const SUBSTACK_URL = 'https://openknowledgespace.substack.com';
 
 /** Extract text from a CDATA or plain string segment */
 function extractCDATA(str: string): string {
-  return str.replace(/<!\[CDATA\[(.*?)\]\]>/gs, '$1').trim();
+  return str.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim();
 }
 
 /** Extract the value between XML tags */

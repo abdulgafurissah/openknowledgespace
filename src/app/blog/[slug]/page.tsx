@@ -8,9 +8,11 @@ export const revalidate = 3600;
 
 export async function generateStaticParams() {
   const posts = await getSubstackPosts();
-  return posts.map((post) => ({
-    slug: post.link.split('/').pop() ?? post.guid,
-  }));
+  return posts
+    .filter((post) => post.link)
+    .map((post) => ({
+      slug: post.link.split('/').filter(Boolean).pop() ?? post.guid,
+    }));
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
