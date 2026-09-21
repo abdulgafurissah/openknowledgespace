@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import DriveUploader, { DriveUploadResult } from '@/components/DriveUploader';
+import BlobUploader, { FileUploadResult } from '@/components/BlobUploader';
 import styles from '../../admin.module.css';
 
 interface EventData {
@@ -28,7 +28,7 @@ export default function AdminEventsPage() {
   const [description, setDescription] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [googleFormUrl, setGoogleFormUrl] = useState('');
-  const [bannerResult, setBannerResult] = useState<DriveUploadResult | null>(null);
+  const [bannerResult, setBannerResult] = useState<FileUploadResult | null>(null);
 
   useEffect(() => {
     fetchEvents();
@@ -67,7 +67,6 @@ export default function AdminEventsPage() {
           eventDate,
           googleFormUrl,
           bannerUrl: bannerResult?.viewUrl ?? null,
-          bannerDriveId: bannerResult?.fileId ?? null,
           isPublished: true, // Auto publish for MVP
         }),
       });
@@ -228,11 +227,11 @@ export default function AdminEventsPage() {
               <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
                 Event Banner (optional)
               </label>
-              <DriveUploader
+              <BlobUploader
                 accept="image/*"
-                label="Upload a promotional banner for the event"
-                onUploadComplete={result => setBannerResult(result)}
-                maxSizeMB={5}
+                label="Upload Event Banner"
+                onUploadComplete={(res: FileUploadResult) => setBannerResult(res)}
+                maxSizeMB={10}
               />
             </div>
 

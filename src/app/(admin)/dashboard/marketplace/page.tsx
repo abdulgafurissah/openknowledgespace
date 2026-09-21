@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 
-import DriveUploader, { DriveUploadResult } from '@/components/DriveUploader';
+import BlobUploader, { FileUploadResult } from '@/components/BlobUploader';
 import styles from '../../admin.module.css';
 
 interface MarketplaceItem {
@@ -44,8 +44,8 @@ export default function AdminMarketplacePage() {
   const [fileType, setFileType] = useState<'ebook' | 'apk' | 'document' | 'other' | 'merch' | 'garment'>('ebook');
   const [isFree, setIsFree] = useState(true);
   const [price, setPrice] = useState('0');
-  const [fileResult, setFileResult] = useState<DriveUploadResult | null>(null);
-  const [thumbResult, setThumbResult] = useState<DriveUploadResult | null>(null);
+  const [fileResult, setFileResult] = useState<FileUploadResult | null>(null);
+  const [thumbResult, setThumbResult] = useState<FileUploadResult | null>(null);
 
   useEffect(() => {
     fetchItems();
@@ -89,12 +89,10 @@ export default function AdminMarketplacePage() {
           fileType,
           isFree,
           price: isFree ? '0' : price,
-          driveFileId: fileResult.fileId,
           downloadUrl: fileResult.downloadUrl,
-          fileMimeType: fileResult.mimeType,
-          fileSize: fileResult.size,
+          fileMimeType: fileResult.mimeType ?? null,
+          fileSize: fileResult.size ? String(fileResult.size) : null,
           thumbnailUrl: thumbResult?.viewUrl ?? null,
-          thumbnailDriveId: thumbResult?.fileId ?? null,
           isPublished: true,
         }),
       });
@@ -122,7 +120,7 @@ export default function AdminMarketplacePage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this marketplace item? This will also remove it from Google Drive.')) return;
+    if (!confirm('Delete this marketplace item?')) return;
     try {
       await fetch(`/api/marketplace/${id}`, { method: 'DELETE' });
       setItems(items.filter(i => i.id !== id));
@@ -154,7 +152,7 @@ export default function AdminMarketplacePage() {
         <div>
           <h1 className={styles.pageTitle}>Marketplace Manager</h1>
           <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-            Manage eBooks, APKs, and downloadable resources. Files are stored on Google Drive.
+            Manage eBooks, APKs, and downloadable resources.
           </p>
         </div>
         <button
@@ -312,12 +310,12 @@ export default function AdminMarketplacePage() {
             {/* File Upload */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                Upload File to Google Drive *
+                Upload File *
               </label>
-              <DriveUploader
+              <BlobUploader
                 accept=".pdf,.epub,.apk,.doc,.docx,.zip,.rar"
                 label="Drag & drop your eBook, APK, or document here"
-                onUploadComplete={result => setFileResult(result)}
+                onUploadComplete={(result: FileUploadResult) => setFileResult(result)}
                 maxSizeMB={100}
               />
             </div>
@@ -327,10 +325,10 @@ export default function AdminMarketplacePage() {
               <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
                 Thumbnail Image *
               </label>
-              <DriveUploader
+              <BlobUploader
                 accept="image/*"
                 label="Upload a cover image for this item"
-                onUploadComplete={result => setThumbResult(result)}
+                onUploadComplete={(result: FileUploadResult) => setThumbResult(result)}
                 maxSizeMB={10}
               />
             </div>

@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useRef, useCallback, DragEvent, ChangeEvent } from 'react';
+import { upload } from '@vercel/blob/client';
 
-export interface DriveUploadResult {
+export interface FileUploadResult {
   fileId: string;
   fileName: string;
   mimeType: string;
@@ -11,30 +12,27 @@ export interface DriveUploadResult {
   size: string;
 }
 
-interface DriveUploaderProps {
+interface BlobUploaderProps {
   /** Comma-separated accepted MIME types or file extensions, e.g. ".pdf,.epub,.apk" */
   accept?: string;
   /** Label shown inside the drop zone */
   label?: string;
   /** Called when upload completes successfully */
-  onUploadComplete?: (result: DriveUploadResult) => void;
-  /** Optional folder ID to upload into */
-  folderId?: string;
+  onUploadComplete?: (result: FileUploadResult) => void;
   /** Max file size in MB (default: 100) */
   maxSizeMB?: number;
 }
 
-export default function DriveUploader({
+export default function BlobUploader({
   accept = '*',
   label = 'Drag & drop a file here, or click to browse',
   onUploadComplete,
-  folderId,
   maxSizeMB = 100,
-}: DriveUploaderProps) {
+}: BlobUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [result, setResult] = useState<DriveUploadResult | null>(null);
+  const [result, setResult] = useState<FileUploadResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -50,31 +48,27 @@ export default function DriveUploader({
       }
 
       setUploading(true);
-      setProgress(10);
+      setProgress(10); // Initial progress
 
       try {
-        const formData = new FormData();
-        formData.append('file', file);
-        if (folderId) formData.append('folderId', folderId);
-
-        // Fake progress animation while uploading
-        const ticker = setInterval(() => {
-          setProgress(p => Math.min(p + 8, 88));
-        }, 400);
-
-        const res = await fetch('/api/upload/drive', {
-          method: 'POST',
-          body: formData,
+        // We use Vercel Blob client upload
+        const blob = await upload(file.name, file, {
+          access: 'public',
+          handleUploadUrl: '/api/upload',
+          onUploadProgress: (progressEvent) => {
+             setProgress(Math.round((progressEvent.loaded / progressEvent.total) * 100));
+          },
         });
 
-        clearInterval(ticker);
+        const data: FileUploadResult = {
+          fileId: blob.url, // Vercel Blob doesn't have an opaque ID, the URL is the identifier
+          fileName: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          viewUrl: blob.url,
+          downloadUrl: blob.downloadUrl,
+          size: file.size.toString(),
+        };
 
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error ?? 'Upload failed');
-        }
-
-        const data: DriveUploadResult = await res.json();
         setProgress(100);
         setResult(data);
         onUploadComplete?.(data);
@@ -84,7 +78,7 @@ export default function DriveUploader({
         setUploading(false);
       }
     },
-    [folderId, maxSizeMB, onUploadComplete]
+    [maxSizeMB, onUploadComplete]
   );
 
   const handleDrop = useCallback(
@@ -164,7 +158,7 @@ export default function DriveUploader({
           accept={accept}
           onChange={handleChange}
           style={{ display: 'none' }}
-          id="drive-file-input"
+          id="blob-file-input"
         />
       </div>
 
@@ -192,7 +186,7 @@ export default function DriveUploader({
           <div
             style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.4rem', textAlign: 'center' }}
           >
-            {progress < 100 ? `Uploading to Google Drive... ${progress}%` : 'Finalizing...'}
+            {progress < 100 ? `Uploading... ${progress}%` : 'Finalizing...'}
           </div>
         </div>
       )}
@@ -258,7 +252,7 @@ export default function DriveUploader({
               {result.fileName}
             </div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
-              {formatSize(result.size)} · Uploaded to Google Drive
+              {formatSize(result.size)} · Uploaded to Vercel Blob
             </div>
           </div>
           <a

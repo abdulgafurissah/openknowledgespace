@@ -3,7 +3,7 @@ import { auth } from '@/auth';
 import { db } from '@/db';
 import { marketplaceItems, users, purchases } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { deleteFileFromDrive } from '@/lib/google-drive';
+import { del } from '@vercel/blob';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -108,12 +108,16 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams) {
     await db.delete(purchases).where(eq(purchases.itemId, id));
     await db.delete(marketplaceItems).where(eq(marketplaceItems.id, id));
 
-    // Clean up files from Google Drive (non-fatal if fails)
+    // Clean up files from Vercel Blob (non-fatal if fails)
     try {
-      if (item.driveFileId) await deleteFileFromDrive(item.driveFileId);
-      if (item.thumbnailDriveId) await deleteFileFromDrive(item.thumbnailDriveId);
-    } catch (driveError) {
-      console.warn('[Drive cleanup warning]', driveError);
+      if (item.downloadUrl && item.downloadUrl.includes('vercel-storage.com')) {
+        await del(item.downloadUrl);
+      }
+      if (item.thumbnailUrl && item.thumbnailUrl.includes('vercel-storage.com')) {
+        await del(item.thumbnailUrl);
+      }
+    } catch (blobError) {
+      console.warn('[Blob cleanup warning]', blobError);
     }
 
     return NextResponse.json({ success: true });

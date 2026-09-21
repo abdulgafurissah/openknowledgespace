@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import DriveUploader, { DriveUploadResult } from "@/components/DriveUploader";
+import BlobUploader, { FileUploadResult } from "@/components/BlobUploader";
 import styles from "../../../admin.module.css";
 import formStyles from "./form.module.css";
 
@@ -10,7 +10,7 @@ export default function CreateCourse() {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [thumbResult, setThumbResult] = useState<DriveUploadResult | null>(null);
+  const [thumbResult, setThumbResult] = useState<FileUploadResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,7 +33,6 @@ export default function CreateCourse() {
           title, 
           description,
           thumbnailUrl: thumbResult.viewUrl,
-          thumbnailDriveId: thumbResult.fileId
         }),
       });
 
@@ -91,10 +90,10 @@ export default function CreateCourse() {
 
           <div className={formStyles.formGroup}>
             <label>Course Thumbnail *</label>
-            <DriveUploader
+            <BlobUploader
               accept="image/*"
-              label="Upload a thumbnail for the course catalog"
-              onUploadComplete={result => setThumbResult(result)}
+              label="Upload Course Thumbnail"
+              onUploadComplete={(res: FileUploadResult) => setThumbResult(res)}
               maxSizeMB={5}
             />
           </div>
