@@ -74,62 +74,72 @@ export default async function MarketplacePage({
     <>
       <style>{`
         .marketplace-hero {
-          padding: 5rem 2rem 3rem;
+          padding: 5rem 2rem 3.5rem;
           text-align: center;
-          background: linear-gradient(180deg, var(--bg-secondary) 0%, transparent 100%);
+          background: var(--bg-secondary);
           border-bottom: 1px solid var(--border-color);
         }
         .marketplace-hero h1 {
-          font-size: clamp(2.2rem, 5vw, 3.5rem);
-          margin-bottom: 1rem;
-          background: linear-gradient(135deg, var(--text-primary), var(--accent-primary));
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
+          font-family: var(--font-heading);
+          font-size: clamp(2.4rem, 5vw, 3.8rem);
+          font-weight: 800;
+          color: var(--text-primary);
+          margin-bottom: 0.75rem;
+          letter-spacing: -0.02em;
         }
         .marketplace-hero p {
+          font-family: var(--font-body);
           font-size: 1.125rem;
           color: var(--text-secondary);
-          max-width: 560px;
+          max-width: 600px;
           margin: 0 auto;
           line-height: 1.7;
         }
         .marketplace-filters {
           display: flex;
-          gap: 0.6rem;
+          gap: 0.75rem;
           flex-wrap: wrap;
-          padding: 2rem 2rem 0;
+          padding: 3rem 2rem 0;
           max-width: 1200px;
           margin: 0 auto;
           justify-content: center;
         }
         .filter-btn {
-          padding: 0.45rem 1.1rem;
+          padding: 0.55rem 1.3rem;
           border-radius: var(--radius-full);
-          border: 1px solid var(--border-color);
-          background: var(--bg-secondary);
-          color: var(--text-secondary);
-          font-size: 0.875rem;
+          border: 1.5px solid var(--border-color);
+          background: #ffffff;
+          color: var(--text-primary);
+          font-family: var(--font-mono);
+          font-size: 0.78rem;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
           cursor: pointer;
           text-decoration: none;
           transition: all var(--transition-fast);
-          font-family: var(--font-body);
+          box-shadow: var(--shadow-sm);
         }
-        .filter-btn:hover, .filter-btn.active {
-          background: var(--accent-primary);
-          border-color: var(--accent-primary);
-          color: white;
+        .filter-btn:hover {
+          border-color: var(--gold);
+          color: var(--gold);
+        }
+        .filter-btn.active {
+          background: var(--bg-dark);
+          border-color: var(--bg-dark);
+          color: var(--accent-primary);
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
         }
         .marketplace-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-          gap: 1.5rem;
-          padding: 2rem;
+          gap: 2rem;
+          padding: 3rem 2rem 6rem;
           max-width: 1200px;
           margin: 0 auto;
         }
         .item-card {
-          background: var(--bg-card);
+          background: #ffffff;
           border: 1px solid var(--border-color);
           border-radius: var(--radius-xl);
           overflow: hidden;
@@ -138,55 +148,79 @@ export default async function MarketplacePage({
           color: inherit;
           display: flex;
           flex-direction: column;
+          box-shadow: var(--shadow-sm);
+          position: relative;
+        }
+        .item-card::before {
+          content: '';
+          position: absolute;
+          top: 0; left: 0; right: 0;
+          height: 3px;
+          background: linear-gradient(90deg, var(--gold), #ecd183);
+          opacity: 0;
+          transition: opacity var(--transition-normal);
+          z-index: 2;
         }
         .item-card:hover {
-          transform: translateY(-4px);
-          border-color: var(--accent-primary);
-          box-shadow: var(--shadow-emerald);
+          transform: translateY(-5px);
+          border-color: var(--gold-border);
+          box-shadow: var(--shadow-lg), 0 0 24px rgba(212, 168, 67, 0.15);
+        }
+        .item-card:hover::before {
+          opacity: 1;
         }
         .item-thumbnail {
           width: 100%;
           aspect-ratio: 16/9;
           object-fit: cover;
           display: block;
+          transition: transform 0.5s ease;
+        }
+        .item-card:hover .item-thumbnail {
+          transform: scale(1.03);
         }
         .item-thumbnail-placeholder {
           width: 100%;
           aspect-ratio: 16/9;
-          background: var(--bg-tertiary);
+          background: var(--bg-secondary);
           display: flex;
           align-items: center;
           justify-content: center;
           font-size: 3rem;
         }
         .item-body {
-          padding: 1.25rem;
+          padding: 1.5rem;
           flex: 1;
           display: flex;
           flex-direction: column;
-          gap: 0.5rem;
+          gap: 0.6rem;
         }
         .item-badge {
-          display: inline-block;
-          font-size: 0.72rem;
-          padding: 0.2rem 0.6rem;
+          display: inline-flex;
+          align-items: center;
+          font-family: var(--font-mono);
+          font-size: 0.7rem;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          padding: 0.25rem 0.75rem;
           border-radius: var(--radius-full);
-          font-weight: 600;
-          letter-spacing: 0.03em;
           width: fit-content;
         }
         .item-title {
-          font-size: 1.05rem;
-          font-weight: 600;
+          font-family: var(--font-heading);
+          font-size: 1.15rem;
+          font-weight: 700;
           color: var(--text-primary);
-          line-height: 1.4;
+          line-height: 1.35;
           display: -webkit-box;
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
           overflow: hidden;
         }
         .item-description {
-          font-size: 0.85rem;
+          font-family: var(--font-body);
+          font-size: 0.88rem;
           color: var(--text-secondary);
           line-height: 1.6;
           display: -webkit-box;
@@ -199,17 +233,19 @@ export default async function MarketplacePage({
           display: flex;
           align-items: center;
           justify-content: space-between;
-          margin-top: 0.75rem;
-          padding-top: 0.75rem;
+          margin-top: 0.85rem;
+          padding-top: 0.85rem;
           border-top: 1px solid var(--border-color);
         }
         .item-price {
+          font-family: var(--font-mono);
           font-size: 1.05rem;
-          font-weight: 700;
-          color: var(--accent-primary);
+          font-weight: 800;
+          color: var(--gold);
         }
         .item-downloads {
-          font-size: 0.78rem;
+          font-family: var(--font-body);
+          font-size: 0.8rem;
           color: var(--text-muted);
         }
         .empty-state {
@@ -219,13 +255,14 @@ export default async function MarketplacePage({
           color: var(--text-muted);
         }
         .empty-state h2 {
-          font-size: 1.5rem;
+          font-family: var(--font-heading);
+          font-size: 1.75rem;
           margin-bottom: 0.75rem;
-          color: var(--text-secondary);
+          color: var(--text-primary);
         }
         @media (max-width: 640px) {
-          .marketplace-grid { padding: 1rem; gap: 1rem; }
-          .marketplace-hero { padding: 3rem 1rem 2rem; }
+          .marketplace-grid { padding: 1.5rem 1rem; gap: 1.25rem; }
+          .marketplace-hero { padding: 3.5rem 1rem 2.5rem; }
         }
       `}</style>
 

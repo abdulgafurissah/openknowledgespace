@@ -50,8 +50,9 @@ export default function HomeHeroSlider({ slides }: HomeHeroSliderProps) {
                 left: 0,
                 width: '100%',
                 opacity: isActive ? 1 : 0,
+                visibility: isActive ? 'visible' : 'hidden',
                 pointerEvents: isActive ? 'auto' : 'none',
-                transition: 'opacity 0.8s ease-in-out',
+                transition: 'opacity 0.6s ease-in-out, visibility 0.6s ease-in-out',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -63,17 +64,24 @@ export default function HomeHeroSlider({ slides }: HomeHeroSliderProps) {
                 
                 {slide.badge && (
                   <span style={{
-                    display: 'inline-block',
-                    background: 'var(--accent-light)',
-                    color: 'var(--accent-primary)',
-                    padding: '0.4rem 1rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    background: '#ffffff',
+                    color: 'var(--text-primary)',
+                    padding: '0.4rem 1.15rem',
                     borderRadius: 'var(--radius-full)',
-                    fontWeight: 600,
-                    fontSize: '0.85rem',
+                    fontFamily: 'var(--font-mono)',
+                    fontWeight: 800,
+                    fontSize: '0.75rem',
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
                     marginBottom: '1.5rem',
-                    border: '1px solid rgba(29,132,152,0.2)'
+                    border: '1.5px solid var(--gold)',
+                    boxShadow: 'var(--shadow-sm)'
                   }}>
-                    {slide.badge}
+                    <span style={{ color: 'var(--gold)', fontSize: '1rem', lineHeight: 1 }}>•</span>
+                    {slide.badge.replace(/^[^a-zA-Z0-9]+/, '')}
                   </span>
                 )}
 
@@ -88,8 +96,8 @@ export default function HomeHeroSlider({ slides }: HomeHeroSliderProps) {
                   </>
                 )}
 
-                <h1 className={`${styles.heroTitle} gradient-text`} style={{ 
-                  fontSize: slide.type !== 'default' ? 'clamp(2rem, 5vw, 3.2rem)' : undefined 
+                <h1 className={styles.heroTitle} style={{ 
+                  fontSize: slide.type !== 'default' ? 'clamp(2.2rem, 5vw, 3.4rem)' : undefined 
                 }}>
                   {slide.title}
                 </h1>
@@ -113,7 +121,19 @@ export default function HomeHeroSlider({ slides }: HomeHeroSliderProps) {
 
                 <div className={styles.ctaGroup} style={{ marginTop: '2rem' }}>
                   <Link href={slide.ctaLink} className={styles.primaryCta}>
-                    {slide.ctaText}
+                    <span>{slide.ctaText}</span>
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: 'var(--gold)',
+                      color: 'var(--bg-dark)',
+                      fontSize: '0.8rem',
+                      fontWeight: 900
+                    }}>→</span>
                   </Link>
                   {slide.type === 'default' && (
                     <Link href="#subjects" className={styles.secondaryCta}>
@@ -124,7 +144,7 @@ export default function HomeHeroSlider({ slides }: HomeHeroSliderProps) {
               </div>
 
               {slide.imageUrl && slide.type !== 'default' && (
-                <div style={{ marginTop: '3rem', width: '100%', maxWidth: '700px', padding: '0 1rem' }}>
+                <div style={{ marginTop: '3rem', width: '100%', maxWidth: '720px', padding: '0 1rem' }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
                     src={slide.imageUrl} 
@@ -132,9 +152,9 @@ export default function HomeHeroSlider({ slides }: HomeHeroSliderProps) {
                     style={{
                       width: '100%',
                       height: 'auto',
-                      maxHeight: '360px',
+                      maxHeight: '380px',
                       objectFit: 'cover',
-                      borderRadius: 'var(--radius-2xl)',
+                      borderRadius: 'var(--radius-xl)',
                       border: '1px solid var(--border-color)',
                       boxShadow: 'var(--shadow-xl)',
                     }}
@@ -143,14 +163,14 @@ export default function HomeHeroSlider({ slides }: HomeHeroSliderProps) {
               )}
 
               {slide.type === 'default' && (
-                <div className={styles.heroVisual} aria-hidden="true" style={{ marginTop: '2rem' }}>
+                <div className={styles.heroVisual} aria-hidden="true" style={{ marginTop: '2.5rem' }}>
                   <div className={styles.geometricFrame}>
                     <div className={styles.starOuter}>
                       <svg viewBox="0 0 200 200" className={styles.starSvg}>
-                        <polygon points="100,10 118,65 175,65 129,100 147,155 100,120 53,155 71,100 25,65 82,65" fill="none" stroke="rgba(201,168,76,0.4)" strokeWidth="1.5"/>
-                        <polygon points="100,30 113,72 157,72 122,97 135,139 100,115 65,139 78,97 43,72 87,72" fill="none" stroke="rgba(201,168,76,0.2)" strokeWidth="1"/>
-                        <circle cx="100" cy="100" r="40" fill="none" stroke="rgba(201,168,76,0.3)" strokeWidth="1" />
-                        <circle cx="100" cy="100" r="6" fill="rgba(201,168,76,0.6)" />
+                        <polygon points="100,10 118,65 175,65 129,100 147,155 100,120 53,155 71,100 25,65 82,65" fill="none" stroke="rgba(212,168,67,0.5)" strokeWidth="1.5"/>
+                        <polygon points="100,30 113,72 157,72 122,97 135,139 100,115 65,139 78,97 43,72 87,72" fill="none" stroke="rgba(212,168,67,0.3)" strokeWidth="1"/>
+                        <circle cx="100" cy="100" r="40" fill="none" stroke="rgba(212,168,67,0.35)" strokeWidth="1" />
+                        <circle cx="100" cy="100" r="6" fill="rgba(212,168,67,0.7)" />
                       </svg>
                     </div>
                   </div>
@@ -181,7 +201,7 @@ export default function HomeHeroSlider({ slides }: HomeHeroSliderProps) {
                 height: '12px',
                 borderRadius: '50%',
                 border: 'none',
-                background: idx === currentIndex ? 'var(--accent-primary)' : 'rgba(29,132,152,0.2)',
+                background: idx === currentIndex ? 'var(--gold)' : 'rgba(0, 0, 0, 0.15)',
                 cursor: 'pointer',
                 transition: 'background 0.3s ease'
               }}

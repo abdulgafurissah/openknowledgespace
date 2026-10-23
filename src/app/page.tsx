@@ -158,8 +158,20 @@ export default async function Home() {
                 continuous charity. All courses are free, no registration required. Simply
                 visit, learn, and act upon what you learn.
               </p>
-              <Link href="/courses" className={styles.primaryCta} style={{ display: "inline-block", marginTop: "1.5rem" }}>
-                Begin Your Journey
+              <Link href="/courses" className={styles.primaryCta} style={{ marginTop: "1.5rem" }}>
+                <span>Begin Your Journey</span>
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  background: 'var(--gold)',
+                  color: 'var(--bg-dark)',
+                  fontSize: '0.8rem',
+                  fontWeight: 900
+                }}>→</span>
               </Link>
             </div>
           </div>
