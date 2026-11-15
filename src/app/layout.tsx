@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import SuqProviders from "@/components/suq/SuqProviders";
 
 export const metadata: Metadata = {
   title: "Open Knowledge Space | Islamic Learning Platform",
@@ -35,7 +36,9 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>
+        <SuqProviders>{children}</SuqProviders>
+      </body>
     </html>
   );
 }
