@@ -6,19 +6,23 @@ import { eq, desc } from "drizzle-orm";
 import styles from "./page.module.css";
 import Navbar from "@/components/Navbar";
 import HomeHeroSlider, { SlideData } from "@/components/HomeHeroSlider";
+import { getSubstackPosts } from "@/lib/substack";
+
+export const revalidate = 60;
 
 export default async function Home() {
   // Fetch a few featured courses for the homepage
-  const courses = await db.select({
-    id: coursesTable.id,
-    title: coursesTable.title,
-    description: coursesTable.description,
-    thumbnailUrl: coursesTable.thumbnailUrl,
-  })
-  .from(coursesTable)
-  .where(eq(coursesTable.isPublished, true))
-  .orderBy(desc(coursesTable.createdAt))
-  .limit(3);
+  const courses = await db
+    .select({
+      id: coursesTable.id,
+      title: coursesTable.title,
+      description: coursesTable.description,
+      thumbnailUrl: coursesTable.thumbnailUrl,
+    })
+    .from(coursesTable)
+    .where(eq(coursesTable.isPublished, true))
+    .orderBy(desc(coursesTable.createdAt))
+    .limit(3);
 
   // Fetch latest event
   const latestEvents = await db.query.events.findMany({
@@ -27,26 +31,31 @@ export default async function Home() {
     limit: 1,
   });
 
-  const latestEvent = latestEvents[0];
+  // Fetch latest Substack articles
+  const substackPosts = await getSubstackPosts();
   const latestCourse = courses[0];
+  const latestEvent = latestEvents[0];
+  const latestArticle = substackPosts[0];
+  const recentArticles = substackPosts.slice(0, 3);
 
   const slides: SlideData[] = [
     {
-      type: 'default',
-      title: 'Seek Knowledge &\nIlluminate Your Heart',
-      description: 'A structured Islamic learning platform offering courses in Quran, Arabic, Fiqh, Aqeedah, and more — completely free for every seeker of knowledge.',
-      ctaText: 'Explore Courses',
-      ctaLink: '/courses',
-    }
+      type: "default",
+      title: "Seek Knowledge &\nIlluminate Your Heart",
+      description:
+        "A structured Islamic learning platform offering courses in Quran, Arabic, Fiqh, Aqeedah, and more — completely free for every seeker of knowledge.",
+      ctaText: "Explore Courses",
+      ctaLink: "/courses",
+    },
   ];
 
   if (latestCourse) {
     slides.push({
-      type: 'course',
-      badge: '✨ New Course',
+      type: "course",
+      badge: "✨ New Course",
       title: latestCourse.title,
-      description: latestCourse.description || 'Join our latest course to expand your knowledge.',
-      ctaText: 'Begin Learning',
+      description: latestCourse.description || "Join our latest course to expand your knowledge.",
+      ctaText: "Begin Learning",
       ctaLink: `/courses/${latestCourse.id}`,
       imageUrl: latestCourse.thumbnailUrl,
     });
@@ -54,13 +63,29 @@ export default async function Home() {
 
   if (latestEvent) {
     slides.push({
-      type: 'event',
-      badge: '📅 Upcoming Event',
+      type: "event",
+      badge: "📅 Upcoming Event",
       title: latestEvent.title,
-      description: latestEvent.description || 'Don\'t miss our upcoming event. Register now!',
-      ctaText: 'Register Now',
+      description: latestEvent.description || "Don't miss our upcoming event. Register now!",
+      ctaText: "Register Now",
       ctaLink: `/events/${latestEvent.id}`,
       imageUrl: latestEvent.bannerUrl,
+    });
+  }
+
+  if (latestArticle) {
+    const slug = latestArticle.link
+      ? latestArticle.link.split("?")[0].split("/").filter(Boolean).pop() ?? latestArticle.guid
+      : latestArticle.guid;
+
+    slides.push({
+      type: "course",
+      badge: "📝 Latest Substack Publication",
+      title: latestArticle.title,
+      description: latestArticle.description || "Read our latest article on religion, faith, and knowledge.",
+      ctaText: "Read Article",
+      ctaLink: `/blog/${slug}`,
+      imageUrl: latestArticle.thumbnail ?? undefined,
     });
   }
 
@@ -142,6 +167,96 @@ export default async function Home() {
           </section>
         )}
 
+        {/* ── Latest Articles & Insights (From Substack) ── */}
+        {recentArticles && recentArticles.length > 0 && (
+          <section
+            className={styles.featuredSection}
+            style={{
+              backgroundColor: "var(--bg-secondary, #ece6dc)",
+              borderTop: "1px solid var(--border-color)",
+              borderBottom: "1px solid var(--border-color)",
+            }}
+          >
+            <div className={styles.sectionHeader}>
+              <span
+                style={{
+                  display: "inline-block",
+                  fontFamily: "var(--font-mono, sans-serif)",
+                  fontSize: "0.76rem",
+                  fontWeight: 800,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: "var(--accent-primary, #d4a843)",
+                  marginBottom: "0.5rem",
+                }}
+              >
+                ✦ From Our Newsletter
+              </span>
+              <h2>Articles &amp; Insights</h2>
+              <div className={styles.ornamentDivider} aria-hidden="true">
+                <span className={styles.ornamentLine} />
+                <span className={styles.ornamentStar}>✦</span>
+                <span className={styles.ornamentLine} />
+              </div>
+              <p className={styles.sectionSubtitle}>
+                Reflections on religion, faith, and mental health — delivered fresh from our Substack
+              </p>
+            </div>
+
+            <div className={styles.featuredGrid}>
+              {recentArticles.map((post) => {
+                const slug = post.link
+                  ? post.link.split("?")[0].split("/").filter(Boolean).pop() ?? post.guid
+                  : post.guid;
+                const date = new Date(post.pubDate).toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                });
+
+                return (
+                  <Link key={post.guid} href={`/blog/${slug}`} className={styles.featuredCard}>
+                    <div className={styles.featuredThumbnail}>
+                      {post.thumbnail ? (
+                        <img
+                          src={post.thumbnail}
+                          alt={post.title}
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                      ) : (
+                        <span className={styles.thumbnailIcon}>📝</span>
+                      )}
+                    </div>
+                    <div className={styles.featuredContent}>
+                      <span
+                        style={{
+                          fontSize: "0.72rem",
+                          fontFamily: "var(--font-mono, sans-serif)",
+                          color: "var(--accent-primary, #d4a843)",
+                          fontWeight: 800,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                        }}
+                      >
+                        {date}
+                      </span>
+                      <h3 style={{ marginTop: "0.35rem" }}>{post.title}</h3>
+                      <p>{post.description}</p>
+                      <span className={styles.viewCourse}>Read Article →</span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+
+            <div className={styles.viewAllWrap}>
+              <Link href="/blog" className={styles.viewAllBtn}>
+                Explore All Articles
+              </Link>
+            </div>
+          </section>
+        )}
+
         {/* ── Why Section ── */}
         <section className={styles.whySection}>
           <div className={styles.whyCard}>
@@ -160,18 +275,22 @@ export default async function Home() {
               </p>
               <Link href="/courses" className={styles.primaryCta} style={{ marginTop: "1.5rem" }}>
                 <span>Begin Your Journey</span>
-                <span style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '50%',
-                  background: 'var(--gold)',
-                  color: 'var(--bg-dark)',
-                  fontSize: '0.8rem',
-                  fontWeight: 900
-                }}>→</span>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "24px",
+                    height: "24px",
+                    borderRadius: "50%",
+                    background: "var(--gold)",
+                    color: "var(--bg-dark)",
+                    fontSize: "0.8rem",
+                    fontWeight: 900,
+                  }}
+                >
+                  →
+                </span>
               </Link>
             </div>
           </div>
@@ -181,7 +300,7 @@ export default async function Home() {
       {/* ── Footer ── */}
       <footer className={styles.footer}>
         <div className={styles.footerInner}>
-          <div className={styles.footerBrand} style={{ display: 'flex', justifyContent: 'center' }}>
+          <div className={styles.footerBrand} style={{ display: "flex", justifyContent: "center" }}>
             <Image src="/logo.png" alt="Open Knowledge Space Logo" width={160} height={60} style={{ objectFit: "contain" }} />
           </div>
           <p className={styles.footerTagline}>
@@ -189,6 +308,9 @@ export default async function Home() {
           </p>
           <div className={styles.footerLinks}>
             <Link href="/courses">Courses</Link>
+            <Link href="/events">Events</Link>
+            <Link href="/suq">Open Suq</Link>
+            <Link href="/blog">Blog</Link>
           </div>
           <div className={styles.footerDivider} />
           <p className={styles.footerCopy}>
