@@ -114,8 +114,8 @@ async function runTests() {
 
   console.log(`✅ Created test order ${testOrderNumber} with ID: ${createdOrder.id}`);
 
-  // Test 5: Verified Payment & Prodigi Fulfilment Pipeline
-  console.log('\nTEST 5: Executing Order Settlement & Automated Fulfilment Pipeline...');
+  // Test 5: Verified Payment Processing (Severed from automated Prodigi)
+  console.log('\nTEST 5: Executing Order Payment Settlement (Merchant Review Queue)...');
   const settlementResult = await orderManager.processVerifiedPayment({
     orderNumber: testOrderNumber,
     paymentReference: `PAY-REF-${testOrderNumber}`,
@@ -126,26 +126,43 @@ async function runTests() {
   if (!settlementResult.success) {
     throw new Error(`Settlement failed: ${settlementResult.message}`);
   }
-  console.log(`✅ Order payment verified and dispatched: ${settlementResult.message}`);
+  console.log(`✅ Order payment secured: ${settlementResult.message}`);
 
-  // Test 6: Verify Idempotency (Duplicate Prevention)
+  // Test 6: Verify Idempotency (Duplicate Webhook Prevention)
   console.log('\nTEST 6: Testing Idempotency (Duplicate Webhook/Payment Notification)...');
   const duplicateResult = await orderManager.processVerifiedPayment({
     orderNumber: testOrderNumber,
     paymentReference: `PAY-REF-${testOrderNumber}`,
     amountPaidGHS: retail + 45,
   });
-  console.log(`✅ Idempotency check result: "${duplicateResult.message}". No duplicate POD order created.`);
+  console.log(`✅ Idempotency check result: "${duplicateResult.message}". No duplicate settlement created.`);
 
-  // Test 7: Verify Fulfilment Record
-  console.log('\nTEST 7: Inspecting Fulfilment Record in Database...');
+  // Test 7: Test Manual Local Fulfilment Action (Self-Print for Ghana/Africa)
+  console.log('\nTEST 7A: Testing Manual Local Fulfilment Action (Self-Print)...');
+  const localFulfilResult = await orderManager.fulfilLocally(createdOrder.id, {
+    carrier: 'VIP Courier / Ghana Post',
+    trackingNumber: 'VIP-ACC-88391',
+    notes: 'Printed locally at Accra branch',
+  });
+  if (!localFulfilResult.success) {
+    throw new Error(`Local fulfilment action failed: ${localFulfilResult.message}`);
+  }
+  console.log(`✅ Local fulfilment action succeeded: ${localFulfilResult.message}`);
+
+  // Test 7B: Test Manual Prodigi Dispatch Action (for International orders)
+  console.log('\nTEST 7B: Testing Manual Prodigi Dispatch Action (International POD)...');
+  const prodigiDispatchResult = await orderManager.submitToProdigi(createdOrder.id);
+  console.log(`✅ Prodigi dispatch action executed with status: ${prodigiDispatchResult.message} (ID: ${prodigiDispatchResult.externalOrderId || 'N/A'})`);
+
+  // Verify Fulfilment Record in Database
+  console.log('\nTEST 7C: Inspecting Fulfilment Record in Database...');
   const fulfilments = await db
     .select()
     .from(suqFulfilmentOrders)
     .where(eq(suqFulfilmentOrders.orderId, createdOrder.id));
 
   if (fulfilments.length === 0) throw new Error('No fulfilment order record created in database!');
-  console.log(`✅ Fulfilment record active with status: "${fulfilments[0].status}", External ID: "${fulfilments[0].externalOrderId}"`);
+  console.log(`✅ Fulfilment record active with status: "${fulfilments[0].status}", Provider: "${fulfilments[0].provider}"`);
 
   // Cleanup test order
   console.log('\nCleaning up test order records...');

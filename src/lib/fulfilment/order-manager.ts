@@ -1,7 +1,11 @@
 /**
  * Open Suq Order Fulfilment Manager
- * Handles the complete lifecycle from verified payment to automated Prodigi POD dispatch.
- * Enforces strict idempotency and safe recovery.
+ *
+ * Manual merchant fulfilment model:
+ * - When payment is verified, order is secured and marked as paid ('pending' fulfilment).
+ * - Automatic connection to Prodigi is SEVERED.
+ * - Local / African orders: merchant prints and fulfils locally, clicking "Fulfill Locally".
+ * - International orders: merchant manually reviews and dispatches to Prodigi via "Send to Prodigi".
  */
 
 import { db } from '@/db';
@@ -13,17 +17,16 @@ import {
   suqFulfilmentEvents,
   suqProductVariants,
   suqProductDesigns,
-  suqAdminAuditLogs,
 } from '@/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { prodigi } from '@/lib/prodigi/client';
 import { FulfilmentItem, FulfilmentRecipient } from './types';
 
 export class OrderManager {
   /**
-   * Settle an order after verified payment and trigger automated POD fulfilment.
-   * Completely idempotent: if called multiple times with the same payment reference,
-   * it skips duplicate submissions.
+   * Settle an order after verified payment.
+   * Completely idempotent: records payment, updates order to 'paid',
+   * and queues it for merchant review (DOES NOT dispatch to Prodigi automatically).
    */
   async processVerifiedPayment(params: {
     orderNumber: string;
@@ -32,7 +35,7 @@ export class OrderManager {
     channel?: string;
     authorizationCode?: string;
     rawPayload?: any;
-  }): Promise<{ success: boolean; message: string; fulfilmentId?: string }> {
+  }): Promise<{ success: boolean; message: string }> {
     const { orderNumber, paymentReference, amountPaidGHS, channel, authorizationCode, rawPayload } = params;
 
     // 1. Fetch Order
@@ -46,28 +49,21 @@ export class OrderManager {
       return { success: false, message: `Order not found: ${orderNumber}` };
     }
 
-    // 2. Check Idempotency: If already paid and fulfilment already submitted, return safely
+    // 2. Check Idempotency: If already paid, return safely
     if (order.paymentStatus === 'paid') {
-      const existingFulfilment = await db
-        .select()
-        .from(suqFulfilmentOrders)
-        .where(eq(suqFulfilmentOrders.orderId, order.id));
-
-      if (existingFulfilment.length > 0 && existingFulfilment[0].status !== 'failed') {
-        console.log(`[OrderManager] Order ${orderNumber} already processed. Skipping duplicate.`);
-        return {
-          success: true,
-          message: 'Order already fulfilled',
-          fulfilmentId: existingFulfilment[0].id,
-        };
-      }
+      console.log(`[OrderManager] Order ${orderNumber} is already marked as paid. Skipping.`);
+      return {
+        success: true,
+        message: 'Order already marked as paid',
+      };
     }
 
-    // 3. Mark Order as Paid
+    // 3. Mark Order as Paid (Fulfilment status stays 'pending' for manual merchant processing)
     await db
       .update(suqOrders)
       .set({
         paymentStatus: 'paid',
+        fulfilmentStatus: 'pending',
         updatedAt: new Date(),
       })
       .where(eq(suqOrders.id, order.id));
@@ -93,7 +89,54 @@ export class OrderManager {
       });
     }
 
-    // 5. Fetch Order Items & Variants to prepare POD Submission
+    console.log(`[OrderManager] Payment secured for order ${orderNumber}. Queued for merchant review.`);
+    return {
+      success: true,
+      message: 'Payment confirmed. Order queued for merchant review.',
+    };
+  }
+
+  /**
+   * Manual Merchant Action: Dispatch an International Order to Prodigi POD API
+   */
+  async submitToProdigi(orderId: string): Promise<{
+    success: boolean;
+    message: string;
+    externalOrderId?: string;
+  }> {
+    // 1. Fetch Order
+    const [order] = await db
+      .select()
+      .from(suqOrders)
+      .where(eq(suqOrders.id, orderId));
+
+    if (!order) {
+      return { success: false, message: 'Order not found' };
+    }
+
+    if (order.paymentStatus !== 'paid') {
+      return { success: false, message: 'Cannot fulfil an unpaid order' };
+    }
+
+    // Check existing fulfilment to prevent double-dispatch
+    const [existingFulfilment] = await db
+      .select()
+      .from(suqFulfilmentOrders)
+      .where(eq(suqFulfilmentOrders.orderId, order.id));
+
+    if (
+      existingFulfilment &&
+      existingFulfilment.provider === 'PRODIGI' &&
+      ['submitted', 'in_production', 'shipped'].includes(existingFulfilment.status)
+    ) {
+      return {
+        success: true,
+        message: `Order already dispatched to Prodigi (${existingFulfilment.externalOrderId})`,
+        externalOrderId: existingFulfilment.externalOrderId ?? undefined,
+      };
+    }
+
+    // 2. Fetch Order Items & Variants
     const items = await db
       .select()
       .from(suqOrderItems)
@@ -110,15 +153,14 @@ export class OrderManager {
         postalOrZipCode: address?.postalCode || address?.postalOrZipCode || '',
         townOrCity: address?.city || '',
         stateOrCounty: address?.stateOrRegion || address?.state || '',
-        countryCode: address?.countryCode || 'GH',
+        countryCode: address?.countryCode || 'US',
       },
     };
 
-    // Build Prodigi items
+    // 3. Build Prodigi Items
     const prodigiItems: FulfilmentItem[] = [];
 
     for (const item of items) {
-      // Look up variant for default artwork or POD SKU
       let podSku = item.skuSnapshot;
       let artworkUrl = item.artworkUrl;
 
@@ -132,7 +174,6 @@ export class OrderManager {
           podSku = variant.podSku;
         }
 
-        // Look up artwork design if not already snapshot
         if (!artworkUrl) {
           const designs = await db
             .select()
@@ -158,10 +199,9 @@ export class OrderManager {
       });
     }
 
-    // 6. Submit to Prodigi Print API
-    let fulfilmentRecordId: string;
+    // 4. Submit to Prodigi Print API
     try {
-      const baseUrl = process.env.NEXTAUTH_URL || 'https://openknowledgespace.com';
+      const baseUrl = process.env.NEXTAUTH_URL || 'https://openknowledge.us.ci';
       const prodigiRes = await prodigi.createOrder({
         merchantReference: order.orderNumber,
         shippingMethod: 'Standard',
@@ -174,22 +214,39 @@ export class OrderManager {
         },
       });
 
-      // Insert or Update Fulfilment Record
-      const [fulfilmentOrder] = await db
-        .insert(suqFulfilmentOrders)
-        .values({
-          orderId: order.id,
-          provider: 'PRODIGI',
-          externalOrderId: prodigiRes.id,
-          status: prodigiRes.status === 'failed' ? 'failed' : 'submitted',
-          shippingMethod: 'Standard',
-          cost: prodigiRes.totalCost ? String(prodigiRes.totalCost) : null,
-          rawPayload: prodigiRes.rawResponse,
-          errorMessage: prodigiRes.status === 'failed' ? JSON.stringify(prodigiRes.rawResponse) : null,
-        })
-        .returning();
+      let fulfilmentRecordId: string;
 
-      fulfilmentRecordId = fulfilmentOrder.id;
+      if (existingFulfilment) {
+        await db
+          .update(suqFulfilmentOrders)
+          .set({
+            provider: 'PRODIGI',
+            externalOrderId: prodigiRes.id,
+            status: prodigiRes.status === 'failed' ? 'failed' : 'submitted',
+            shippingMethod: 'Standard',
+            cost: prodigiRes.totalCost ? String(prodigiRes.totalCost) : null,
+            rawPayload: prodigiRes.rawResponse,
+            errorMessage: prodigiRes.status === 'failed' ? JSON.stringify(prodigiRes.rawResponse) : null,
+            updatedAt: new Date(),
+          })
+          .where(eq(suqFulfilmentOrders.id, existingFulfilment.id));
+        fulfilmentRecordId = existingFulfilment.id;
+      } else {
+        const [inserted] = await db
+          .insert(suqFulfilmentOrders)
+          .values({
+            orderId: order.id,
+            provider: 'PRODIGI',
+            externalOrderId: prodigiRes.id,
+            status: prodigiRes.status === 'failed' ? 'failed' : 'submitted',
+            shippingMethod: 'Standard',
+            cost: prodigiRes.totalCost ? String(prodigiRes.totalCost) : null,
+            rawPayload: prodigiRes.rawResponse,
+            errorMessage: prodigiRes.status === 'failed' ? JSON.stringify(prodigiRes.rawResponse) : null,
+          })
+          .returning();
+        fulfilmentRecordId = inserted.id;
+      }
 
       // Update Order Status
       await db
@@ -204,28 +261,37 @@ export class OrderManager {
       await db.insert(suqFulfilmentEvents).values({
         fulfilmentOrderId: fulfilmentRecordId,
         eventName: prodigiRes.status === 'failed' ? 'SUBMISSION_FAILED' : 'SUBMITTED_TO_PRODIGI',
-        description: `Order ${order.orderNumber} submitted to Prodigi with external ID ${prodigiRes.id}`,
+        description: `Order ${order.orderNumber} manually submitted to Prodigi by admin with external ID ${prodigiRes.id}`,
         rawPayload: prodigiRes.rawResponse,
       });
 
       return {
         success: prodigiRes.status !== 'failed',
         message: prodigiRes.status === 'failed' ? 'Fulfilment submission failed' : 'Order submitted to Prodigi',
-        fulfilmentId: fulfilmentRecordId,
+        externalOrderId: prodigiRes.id,
       };
     } catch (err: any) {
       console.error('[OrderManager Prodigi Submission Error]', err);
 
-      const [failedRecord] = await db
-        .insert(suqFulfilmentOrders)
-        .values({
+      if (existingFulfilment) {
+        await db
+          .update(suqFulfilmentOrders)
+          .set({
+            provider: 'PRODIGI',
+            status: 'failed',
+            errorMessage: err.message,
+            updatedAt: new Date(),
+          })
+          .where(eq(suqFulfilmentOrders.id, existingFulfilment.id));
+      } else {
+        await db.insert(suqFulfilmentOrders).values({
           orderId: order.id,
           provider: 'PRODIGI',
           status: 'failed',
           shippingMethod: 'Standard',
           errorMessage: err.message,
-        })
-        .returning();
+        });
+      }
 
       await db
         .update(suqOrders)
@@ -238,34 +304,140 @@ export class OrderManager {
       return {
         success: false,
         message: `Fulfilment failed: ${err.message}`,
-        fulfilmentId: failedRecord.id,
       };
     }
+  }
+
+  /**
+   * Manual Merchant Action: Fulfill a Local Ghana or African Order
+   * (Printed and packaged directly by the website owner)
+   */
+  async fulfilLocally(
+    orderId: string,
+    params: {
+      carrier?: string;
+      trackingNumber?: string;
+      notes?: string;
+    }
+  ): Promise<{ success: boolean; message: string }> {
+    const [order] = await db
+      .select()
+      .from(suqOrders)
+      .where(eq(suqOrders.id, orderId));
+
+    if (!order) {
+      return { success: false, message: 'Order not found' };
+    }
+
+    if (order.paymentStatus !== 'paid') {
+      return { success: false, message: 'Cannot fulfil an unpaid order' };
+    }
+
+    const carrierName = params.carrier?.trim() || 'Local / Self-Print';
+    const trackingNum = params.trackingNumber?.trim() || null;
+
+    // Check existing fulfilment record
+    const [existingFulfilment] = await db
+      .select()
+      .from(suqFulfilmentOrders)
+      .where(eq(suqFulfilmentOrders.orderId, order.id));
+
+    let fulfilmentRecordId: string;
+
+    if (existingFulfilment) {
+      await db
+        .update(suqFulfilmentOrders)
+        .set({
+          provider: 'LOCAL_PRINT',
+          status: 'shipped',
+          carrier: carrierName,
+          trackingNumber: trackingNum,
+          shippingMethod: 'Local Fulfilment',
+          updatedAt: new Date(),
+        })
+        .where(eq(suqFulfilmentOrders.id, existingFulfilment.id));
+      fulfilmentRecordId = existingFulfilment.id;
+    } else {
+      const [inserted] = await db
+        .insert(suqFulfilmentOrders)
+        .values({
+          orderId: order.id,
+          provider: 'LOCAL_PRINT',
+          status: 'shipped',
+          carrier: carrierName,
+          trackingNumber: trackingNum,
+          shippingMethod: 'Local Fulfilment',
+        })
+        .returning();
+      fulfilmentRecordId = inserted.id;
+    }
+
+    // Update main order
+    const updatedNotes = params.notes
+      ? `${order.notes ? order.notes + ' | ' : ''}${params.notes}`
+      : order.notes;
+
+    await db
+      .update(suqOrders)
+      .set({
+        fulfilmentStatus: 'shipped',
+        notes: updatedNotes,
+        updatedAt: new Date(),
+      })
+      .where(eq(suqOrders.id, order.id));
+
+    // Record Event
+    await db.insert(suqFulfilmentEvents).values({
+      fulfilmentOrderId: fulfilmentRecordId,
+      eventName: 'FULFILLED_LOCALLY',
+      description: `Order printed and dispatched locally via ${carrierName}${trackingNum ? ` (Trk: ${trackingNum})` : ''}`,
+    });
+
+    return {
+      success: true,
+      message: 'Order marked as fulfilled locally and status updated to shipped.',
+    };
+  }
+
+  /**
+   * Manual Merchant Action: Mark Order Delivered
+   */
+  async markDelivered(orderId: string): Promise<{ success: boolean; message: string }> {
+    const [order] = await db
+      .select()
+      .from(suqOrders)
+      .where(eq(suqOrders.id, orderId));
+
+    if (!order) return { success: false, message: 'Order not found' };
+
+    await db
+      .update(suqOrders)
+      .set({
+        fulfilmentStatus: 'delivered',
+        updatedAt: new Date(),
+      })
+      .where(eq(suqOrders.id, order.id));
+
+    const [existingFulfilment] = await db
+      .select()
+      .from(suqFulfilmentOrders)
+      .where(eq(suqFulfilmentOrders.orderId, order.id));
+
+    if (existingFulfilment) {
+      await db
+        .update(suqFulfilmentOrders)
+        .set({ status: 'shipped', updatedAt: new Date() })
+        .where(eq(suqFulfilmentOrders.id, existingFulfilment.id));
+    }
+
+    return { success: true, message: 'Order marked as delivered.' };
   }
 
   /**
    * Safe Admin Retry for Failed Fulfilment
    */
   async retryFailedFulfilment(orderId: string): Promise<boolean> {
-    const [order] = await db
-      .select()
-      .from(suqOrders)
-      .where(eq(suqOrders.id, orderId));
-
-    if (!order || order.paymentStatus !== 'paid') return false;
-
-    // Reset status and re-process
-    await db
-      .update(suqOrders)
-      .set({ fulfilmentStatus: 'pending' })
-      .where(eq(suqOrders.id, orderId));
-
-    const result = await this.processVerifiedPayment({
-      orderNumber: order.orderNumber,
-      paymentReference: `retry_${Date.now()}`,
-      amountPaidGHS: parseFloat(order.totalAmount),
-    });
-
+    const result = await this.submitToProdigi(orderId);
     return result.success;
   }
 }

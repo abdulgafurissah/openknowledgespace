@@ -54,8 +54,8 @@ export default async function CheckoutVerifyPage({
 
     const amountGHS = parseFloat(fromPesewas(verifyRes.data.amount));
 
-    // 2. Process order settlement & Prodigi POD submission
-    const fulfilmentResult = await orderManager.processVerifiedPayment({
+    // 2. Process order payment settlement (queues order for merchant fulfilment)
+    await orderManager.processVerifiedPayment({
       orderNumber: targetRef,
       paymentReference: targetRef,
       amountPaidGHS: amountGHS,
@@ -80,7 +80,7 @@ export default async function CheckoutVerifyPage({
             amountGHS={amountGHS}
             customerName={order?.guestName ?? undefined}
             customerEmail={order?.guestEmail ?? undefined}
-            fulfilmentStatus={order?.fulfilmentStatus || 'Submitted to Prodigi'}
+            fulfilmentStatus={order?.fulfilmentStatus || 'pending'}
           />
         </main>
       </div>

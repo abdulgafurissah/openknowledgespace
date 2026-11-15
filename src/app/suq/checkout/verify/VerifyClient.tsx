@@ -122,7 +122,7 @@ export default function VerifyClient({
               <div className="verify-icon-wrap verify-icon-success">✓</div>
               <h1 className="verify-title">Payment Confirmed!</h1>
               <p className="verify-sub">
-                Alhamdulillah! Your order has been placed successfully and submitted to our print-on-demand production pipeline.
+                Alhamdulillah! Your order has been placed and payment confirmed. Our team is preparing your items for packaging and dispatch.
               </p>
 
               <div className="receipt-box">
@@ -149,9 +149,9 @@ export default function VerifyClient({
                   </strong>
                 </div>
                 <div className="receipt-line">
-                  <span>Production Status</span>
+                  <span>Fulfilment Status</span>
                   <span className="fulfilment-badge">
-                    ● {fulfilmentStatus || 'Submitted to Prodigi'}
+                    ● {fulfilmentStatus === 'pending' ? 'Confirmed & Preparing' : fulfilmentStatus}
                   </span>
                 </div>
               </div>

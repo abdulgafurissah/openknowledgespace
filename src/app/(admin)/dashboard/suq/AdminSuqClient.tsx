@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import BlobUploader, { FileUploadResult } from '@/components/BlobUploader';
 import { formatCurrency } from '@/lib/suq/currency';
 import { calculatePricingBreakdown } from '@/lib/suq/pricing';
+import { getOrderDestination } from '@/lib/suq/destination';
 
 export default function AdminSuqClient() {
   const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'products' | 'integrations'>('overview');
@@ -18,6 +19,15 @@ export default function AdminSuqClient() {
   const [orderSearch, setOrderSearch] = useState('');
   const [orderFilter, setOrderFilter] = useState('ALL');
   const [retryingOrderId, setRetryingOrderId] = useState<string | null>(null);
+  const [submittingProdigiId, setSubmittingProdigiId] = useState<string | null>(null);
+
+  // Local Fulfilment Modal State
+  const [localFulfilModalOrder, setLocalFulfilModalOrder] = useState<any | null>(null);
+  const [localCarrier, setLocalCarrier] = useState('Ghana Post');
+  const [localTrackingNumber, setLocalTrackingNumber] = useState('');
+  const [localNotes, setLocalNotes] = useState('');
+  const [submittingLocalFulfil, setSubmittingLocalFulfil] = useState(false);
+  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Products
   const [products, setProducts] = useState<any[]>([]);
@@ -108,15 +118,105 @@ export default function AdminSuqClient() {
         method: 'POST',
       });
       if (res.ok) {
-        alert('Fulfilment retry triggered successfully!');
+        setActionMessage({ type: 'success', text: 'Fulfilment retry triggered successfully!' });
         fetchOrders();
       } else {
-        alert('Retry failed. Please check error logs.');
+        setActionMessage({ type: 'error', text: 'Retry failed. Please check error logs.' });
       }
     } catch {
-      alert('Network error while retrying.');
+      setActionMessage({ type: 'error', text: 'Network error while retrying.' });
     } finally {
       setRetryingOrderId(null);
+    }
+  }
+
+  async function handleDispatchToProdigi(orderId: string, orderNumber: string) {
+    if (!confirm(`Are you sure you want to dispatch order ${orderNumber} to Prodigi for international printing & fulfilment?`)) return;
+    setSubmittingProdigiId(orderId);
+    setActionMessage(null);
+    try {
+      const res = await fetch(`/api/suq/admin/orders/${orderId}/submit-prodigi`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setActionMessage({
+          type: 'success',
+          text: `Order ${orderNumber} successfully submitted to Prodigi! (External ID: ${data.externalOrderId || 'active'})`,
+        });
+        fetchOrders();
+      } else {
+        setActionMessage({
+          type: 'error',
+          text: `Prodigi dispatch failed: ${data.message || 'Unknown error'}`,
+        });
+      }
+    } catch {
+      setActionMessage({ type: 'error', text: 'Network error while contacting Prodigi.' });
+    } finally {
+      setSubmittingProdigiId(null);
+    }
+  }
+
+  async function handleConfirmLocalFulfil() {
+    if (!localFulfilModalOrder) return;
+    setSubmittingLocalFulfil(true);
+    setActionMessage(null);
+    try {
+      const res = await fetch(`/api/suq/admin/orders/${localFulfilModalOrder.id}/fulfil-local`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          carrier: localCarrier,
+          trackingNumber: localTrackingNumber,
+          notes: localNotes,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setActionMessage({
+          type: 'success',
+          text: `Order ${localFulfilModalOrder.orderNumber} marked as fulfilled locally!`,
+        });
+        setLocalFulfilModalOrder(null);
+        setLocalTrackingNumber('');
+        setLocalNotes('');
+        fetchOrders();
+      } else {
+        setActionMessage({
+          type: 'error',
+          text: `Local fulfilment update failed: ${data.message || 'Unknown error'}`,
+        });
+      }
+    } catch {
+      setActionMessage({ type: 'error', text: 'Network error during local fulfilment update.' });
+    } finally {
+      setSubmittingLocalFulfil(false);
+    }
+  }
+
+  async function handleMarkDelivered(orderId: string, orderNumber: string) {
+    if (!confirm(`Mark order ${orderNumber} as delivered?`)) return;
+    setActionMessage(null);
+    try {
+      const res = await fetch(`/api/suq/admin/orders/${orderId}/mark-delivered`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setActionMessage({
+          type: 'success',
+          text: `Order ${orderNumber} marked as delivered!`,
+        });
+        fetchOrders();
+      } else {
+        setActionMessage({
+          type: 'error',
+          text: `Failed to mark delivered: ${data.message || 'Unknown error'}`,
+        });
+      }
+    } catch {
+      setActionMessage({ type: 'error', text: 'Network error.' });
     }
   }
 
@@ -229,15 +329,30 @@ export default function AdminSuqClient() {
   );
 
   const filteredOrders = orders.filter(ord => {
-    if (orderFilter !== 'ALL' && ord.fulfilmentStatus !== orderFilter.toLowerCase() && ord.paymentStatus !== orderFilter.toLowerCase()) {
-      return false;
+    const dest = getOrderDestination(ord.shippingAddress?.countryCode);
+
+    if (orderFilter === 'LOCAL_PRINT') {
+      if (dest.type !== 'local' && dest.type !== 'african') return false;
+    } else if (orderFilter === 'INTERNATIONAL') {
+      if (dest.type !== 'international') return false;
+    } else if (orderFilter === 'NEEDS_FULFILMENT') {
+      if (ord.paymentStatus !== 'paid' || (ord.fulfilmentStatus !== 'pending' && ord.fulfilmentStatus !== 'failed')) return false;
+    } else if (orderFilter === 'PAID') {
+      if (ord.paymentStatus !== 'paid') return false;
+    } else if (orderFilter === 'SHIPPED') {
+      if (ord.fulfilmentStatus !== 'shipped' && ord.fulfilmentStatus !== 'delivered') return false;
+    } else if (orderFilter === 'FAILED') {
+      if (ord.fulfilmentStatus !== 'failed') return false;
     }
+
     if (orderSearch) {
       const q = orderSearch.toLowerCase();
       const matchNum = ord.orderNumber?.toLowerCase().includes(q);
       const matchEmail = ord.guestEmail?.toLowerCase().includes(q);
       const matchName = ord.guestName?.toLowerCase().includes(q);
-      return matchNum || matchEmail || matchName;
+      const matchCountry = ord.shippingAddress?.countryCode?.toLowerCase().includes(q);
+      const matchCity = ord.shippingAddress?.city?.toLowerCase().includes(q);
+      return matchNum || matchEmail || matchName || matchCountry || matchCity;
     }
     return true;
   });
@@ -362,6 +477,59 @@ export default function AdminSuqClient() {
         .status-pending { background: rgba(245,158,11,0.15); color: #d97706; }
         .status-failed { background: rgba(239,68,68,0.15); color: #dc2626; }
         .status-shipped { background: rgba(59,130,246,0.15); color: #2563eb; }
+        .status-submitted { background: rgba(147,51,234,0.15); color: #7c3aed; }
+        .status-delivered { background: rgba(16,185,129,0.2); color: #047857; }
+        .btn-action-prodigi {
+          padding: 0.35rem 0.75rem;
+          border-radius: 6px;
+          background: #2563eb;
+          color: #ffffff;
+          border: none;
+          cursor: pointer;
+          font-size: 0.76rem;
+          font-weight: 700;
+          transition: all 0.2s ease;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.25rem;
+          white-space: nowrap;
+        }
+        .btn-action-prodigi:hover { background: #1d4ed8; }
+        .btn-action-local {
+          padding: 0.35rem 0.75rem;
+          border-radius: 6px;
+          background: #059669;
+          color: #ffffff;
+          border: none;
+          cursor: pointer;
+          font-size: 0.76rem;
+          font-weight: 700;
+          transition: all 0.2s ease;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.25rem;
+          white-space: nowrap;
+        }
+        .btn-action-local:hover { background: #047857; }
+        .btn-action-delivered {
+          padding: 0.3rem 0.65rem;
+          border-radius: 6px;
+          background: #ecfdf5;
+          color: #065f46;
+          border: 1px solid #a7f3d0;
+          cursor: pointer;
+          font-size: 0.74rem;
+          font-weight: 700;
+          white-space: nowrap;
+        }
+        .dest-badge {
+          display: inline-block;
+          padding: 0.15rem 0.5rem;
+          border-radius: 4px;
+          font-size: 0.72rem;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+        }
       `}</style>
 
       <div className="admin-suq-page">
@@ -468,9 +636,9 @@ export default function AdminSuqClient() {
                     <span className="kpi-sub">Across 6 main categories</span>
                   </div>
                   <div className="kpi-card">
-                    <span className="kpi-label">Fulfilment Provider</span>
-                    <span className="kpi-val" style={{ fontSize: '1.25rem' }}>PRODIGI (v4.0)</span>
-                    <span className="kpi-sub">International Labs (UK/US/EU)</span>
+                    <span className="kpi-label">Fulfilment Architecture</span>
+                    <span className="kpi-val" style={{ fontSize: '1.15rem' }}>Hybrid Manual Routing</span>
+                    <span className="kpi-sub">Self-Print (Africa) • Prodigi (International)</span>
                   </div>
                 </div>
               </>
@@ -481,10 +649,37 @@ export default function AdminSuqClient() {
         {/* ─── TAB 2: ORDERS & FULFILMENT ─── */}
         {activeTab === 'orders' && (
           <div>
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+            {/* Action Feedback Banner */}
+            {actionMessage && (
+              <div
+                style={{
+                  padding: '1rem 1.25rem',
+                  borderRadius: '0.75rem',
+                  marginBottom: '1.5rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: actionMessage.type === 'success' ? '#ecfdf5' : '#fef2f2',
+                  border: `1px solid ${actionMessage.type === 'success' ? '#a7f3d0' : '#fecaca'}`,
+                  color: actionMessage.type === 'success' ? '#065f46' : '#991b1b',
+                  fontSize: '0.9rem',
+                  fontWeight: 600,
+                }}
+              >
+                <span>{actionMessage.type === 'success' ? '✓ ' : '✕ '}{actionMessage.text}</span>
+                <button
+                  onClick={() => setActionMessage(null)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'inherit' }}
+                >
+                  &times;
+                </button>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
               <input
                 type="text"
-                placeholder="Search orders by number or email..."
+                placeholder="Search by order #, email, customer, or country..."
                 value={orderSearch}
                 onChange={e => setOrderSearch(e.target.value)}
                 style={{
@@ -492,19 +687,27 @@ export default function AdminSuqClient() {
                   borderRadius: '9999px',
                   border: '1px solid var(--border-color)',
                   background: '#ffffff',
-                  fontSize: '0.9rem',
+                  fontSize: '0.88rem',
                   minWidth: '280px',
                 }}
               />
-              <div style={{ display: 'flex', gap: '0.4rem' }}>
-                {['ALL', 'PAID', 'PENDING', 'SUBMITTED', 'FAILED'].map(f => (
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                {[
+                  { id: 'ALL', label: 'All Orders' },
+                  { id: 'LOCAL_PRINT', label: '🇬🇭 Local & Africa (Self-Print)' },
+                  { id: 'INTERNATIONAL', label: '✈️ International (Prodigi)' },
+                  { id: 'NEEDS_FULFILMENT', label: '⏳ Needs Fulfilment' },
+                  { id: 'PAID', label: 'Paid' },
+                  { id: 'SHIPPED', label: 'Shipped' },
+                  { id: 'FAILED', label: 'Failed' },
+                ].map(f => (
                   <button
-                    key={f}
-                    className={`filter-btn ${orderFilter === f ? 'active' : ''}`}
-                    onClick={() => setOrderFilter(f)}
-                    style={{ padding: '0.45rem 1rem', fontSize: '0.75rem' }}
+                    key={f.id}
+                    className={`filter-btn ${orderFilter === f.id ? 'active' : ''}`}
+                    onClick={() => setOrderFilter(f.id)}
+                    style={{ padding: '0.45rem 0.85rem', fontSize: '0.75rem' }}
                   >
-                    {f}
+                    {f.label}
                   </button>
                 ))}
               </div>
@@ -515,7 +718,7 @@ export default function AdminSuqClient() {
                 <div style={{ padding: '3rem', textAlign: 'center' }}>Loading orders...</div>
               ) : filteredOrders.length === 0 ? (
                 <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  No orders found.
+                  No orders found matching the selected filter.
                 </div>
               ) : (
                 <div style={{ overflowX: 'auto' }}>
@@ -524,72 +727,274 @@ export default function AdminSuqClient() {
                       <tr>
                         <th>Order #</th>
                         <th>Date</th>
-                        <th>Customer</th>
+                        <th>Customer &amp; Destination</th>
                         <th>Total</th>
                         <th>Payment</th>
-                        <th>POD Status</th>
-                        <th>Prodigi ID / Tracking</th>
-                        <th>Actions</th>
+                        <th>Fulfilment Route</th>
+                        <th>Status &amp; Tracking</th>
+                        <th style={{ minWidth: '180px' }}>Manual Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredOrders.map(ord => (
-                        <tr key={ord.id}>
-                          <td><strong>{ord.orderNumber}</strong></td>
-                          <td>{new Date(ord.createdAt).toLocaleDateString()}</td>
-                          <td>
-                            <div>{ord.guestName || 'Customer'}</div>
-                            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{ord.guestEmail}</div>
-                          </td>
-                          <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
-                            {formatCurrency(ord.totalAmount, 'GHS')}
-                          </td>
-                          <td>
-                            <span className={`status-badge status-${ord.paymentStatus}`}>
-                              {ord.paymentStatus}
-                            </span>
-                          </td>
-                          <td>
-                            <span className={`status-badge status-${ord.fulfilmentStatus}`}>
-                              {ord.fulfilmentStatus}
-                            </span>
-                          </td>
-                          <td>
-                            <div style={{ fontSize: '0.8rem' }}>
-                              {ord.fulfilment?.externalOrderId || '—'}
-                            </div>
-                            {ord.fulfilment?.trackingNumber && (
-                              <div style={{ fontSize: '0.75rem', color: '#2563eb' }}>
-                                Trk: {ord.fulfilment.trackingNumber}
+                      {filteredOrders.map(ord => {
+                        const dest = getOrderDestination(ord.shippingAddress?.countryCode);
+                        const isPaid = ord.paymentStatus === 'paid';
+                        const isPendingFulfilment = ord.fulfilmentStatus === 'pending' || ord.fulfilmentStatus === 'failed';
+                        const isShipped = ord.fulfilmentStatus === 'shipped';
+                        const isDelivered = ord.fulfilmentStatus === 'delivered';
+                        const isSubmitted = ord.fulfilmentStatus === 'submitted' || ord.fulfilmentStatus === 'in_production';
+
+                        return (
+                          <tr key={ord.id}>
+                            <td><strong>{ord.orderNumber}</strong></td>
+                            <td style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                              {new Date(ord.createdAt).toLocaleDateString()}
+                            </td>
+                            <td>
+                              <div style={{ fontWeight: 600 }}>{ord.guestName || 'Customer'}</div>
+                              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                                {ord.guestEmail}
                               </div>
-                            )}
-                          </td>
-                          <td>
-                            {ord.fulfilmentStatus === 'failed' && (
-                              <button
-                                onClick={() => handleRetryFulfilment(ord.id)}
-                                disabled={retryingOrderId === ord.id}
-                                style={{
-                                  padding: '0.35rem 0.75rem',
-                                  borderRadius: '4px',
-                                  background: '#ef4444',
-                                  color: '#fff',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  fontSize: '0.75rem',
-                                }}
-                              >
-                                {retryingOrderId === ord.id ? 'Retrying...' : 'Retry POD'}
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                              <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                                <span
+                                  className="dest-badge"
+                                  style={{
+                                    background: dest.badgeStyle.background,
+                                    color: dest.badgeStyle.color,
+                                    border: dest.badgeStyle.border,
+                                  }}
+                                >
+                                  {dest.label}
+                                </span>
+                                {ord.shippingAddress?.city && (
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                    {ord.shippingAddress.city}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                              {formatCurrency(ord.totalAmount, 'GHS')}
+                            </td>
+                            <td>
+                              <span className={`status-badge status-${ord.paymentStatus}`}>
+                                {ord.paymentStatus}
+                              </span>
+                            </td>
+                            <td>
+                              {ord.fulfilment?.provider === 'LOCAL_PRINT' ? (
+                                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#059669' }}>
+                                  🏷️ Local Self-Print
+                                </span>
+                              ) : ord.fulfilment?.provider === 'PRODIGI' ? (
+                                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#2563eb' }}>
+                                  🌐 Prodigi POD
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                                  {dest.type === 'international' ? '✈️ Prodigi Candidate' : '🇬🇭 Self-Print Candidate'}
+                                </span>
+                              )}
+                            </td>
+                            <td>
+                              <span className={`status-badge status-${ord.fulfilmentStatus}`}>
+                                {ord.fulfilmentStatus}
+                              </span>
+                              {ord.fulfilment?.externalOrderId && (
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                                  ID: {ord.fulfilment.externalOrderId}
+                                </div>
+                              )}
+                              {ord.fulfilment?.trackingNumber && (
+                                <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '0.2rem' }}>
+                                  {ord.fulfilment.carrier ? `${ord.fulfilment.carrier}: ` : ''}
+                                  {ord.fulfilment.trackingUrl ? (
+                                    <a
+                                      href={ord.fulfilment.trackingUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={{ textDecoration: 'underline' }}
+                                    >
+                                      {ord.fulfilment.trackingNumber}
+                                    </a>
+                                  ) : (
+                                    ord.fulfilment.trackingNumber
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                            <td>
+                              {!isPaid ? (
+                                <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                                  Awaiting payment
+                                </span>
+                              ) : (
+                                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                  {/* Pending Fulfilment Actions */}
+                                  {isPendingFulfilment && (
+                                    <>
+                                      {/* Local Fulfilment Button (Primary for local/africa, secondary for intl) */}
+                                      <button
+                                        onClick={() => {
+                                          setLocalFulfilModalOrder(ord);
+                                          setLocalCarrier(dest.type === 'local' ? 'Ghana Post / VIP Dispatch' : 'African Courier Service');
+                                        }}
+                                        className="btn-action-local"
+                                        title="Print and package this order yourself"
+                                      >
+                                        🏷️ Fulfil Locally
+                                      </button>
+
+                                      {/* Prodigi Dispatch Button (Primary for intl, secondary for local) */}
+                                      <button
+                                        onClick={() => handleDispatchToProdigi(ord.id, ord.orderNumber)}
+                                        disabled={submittingProdigiId === ord.id}
+                                        className="btn-action-prodigi"
+                                        title="Submit order to Prodigi Print API"
+                                      >
+                                        {submittingProdigiId === ord.id ? 'Submitting...' : '✈️ Send to Prodigi'}
+                                      </button>
+                                    </>
+                                  )}
+
+                                  {/* Submitted to Prodigi: In Production */}
+                                  {isSubmitted && (
+                                    <span style={{ fontSize: '0.78rem', color: '#7c3aed', fontWeight: 600 }}>
+                                      ● In Production (Prodigi)
+                                    </span>
+                                  )}
+
+                                  {/* Shipped: Can Mark Delivered */}
+                                  {isShipped && (
+                                    <button
+                                      onClick={() => handleMarkDelivered(ord.id, ord.orderNumber)}
+                                      className="btn-action-delivered"
+                                      title="Mark order as successfully delivered"
+                                    >
+                                      ✓ Mark Delivered
+                                    </button>
+                                  )}
+
+                                  {/* Delivered */}
+                                  {isDelivered && (
+                                    <span style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 700 }}>
+                                      ✓ Completed
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
             </div>
+
+            {/* Local Fulfilment Modal */}
+            {localFulfilModalOrder && (
+              <div
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: 'rgba(0, 0, 0, 0.55)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 9999,
+                  padding: '1.5rem',
+                }}
+              >
+                <div
+                  style={{
+                    background: '#ffffff',
+                    borderRadius: '1rem',
+                    padding: '2rem',
+                    maxWidth: '520px',
+                    width: '100%',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                    <h3 style={{ margin: 0, fontFamily: 'var(--font-heading)', fontSize: '1.35rem' }}>
+                      Local / Self-Print Fulfilment
+                    </h3>
+                    <button
+                      onClick={() => setLocalFulfilModalOrder(null)}
+                      style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-muted)' }}
+                    >
+                      &times;
+                    </button>
+                  </div>
+
+                  <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+                    You are marking Order <strong>{localFulfilModalOrder.orderNumber}</strong> as printed and dispatched locally by yourself.
+                  </p>
+
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                      Delivery Carrier / Dispatch Method
+                    </label>
+                    <input
+                      type="text"
+                      value={localCarrier}
+                      onChange={e => setLocalCarrier(e.target.value)}
+                      placeholder="e.g. Ghana Post, VIP Courier, Dispatch Rider, In-Person Pickup"
+                      style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                      Tracking Number or Waybill (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={localTrackingNumber}
+                      onChange={e => setLocalTrackingNumber(e.target.value)}
+                      placeholder="e.g. GP-994821 or Waybill #402"
+                      style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                      Internal Dispatch Notes (Optional)
+                    </label>
+                    <textarea
+                      value={localNotes}
+                      onChange={e => setLocalNotes(e.target.value)}
+                      placeholder="Printed locally, handed to dispatch rider on 15 Nov."
+                      rows={2}
+                      style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '6px', border: '1px solid var(--border-color)', resize: 'none' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => setLocalFulfilModalOrder(null)}
+                      className="filter-btn"
+                      style={{ padding: '0.6rem 1.25rem' }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleConfirmLocalFulfil}
+                      disabled={submittingLocalFulfil}
+                      className="btn-action-local"
+                      style={{ padding: '0.6rem 1.5rem', fontSize: '0.82rem' }}
+                    >
+                      {submittingLocalFulfil ? 'Updating...' : '✓ Confirm Fulfilment'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -911,7 +1316,7 @@ export default function AdminSuqClient() {
 
               <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                 <div><strong>Environment:</strong> {stats?.integrations?.prodigi?.environment || 'sandbox'}</div>
-                <div><strong>Fulfilment Mode:</strong> Automated On-Demand (Zero Inventory)</div>
+                <div><strong>Fulfilment Mode:</strong> Manual On-Demand (International) &amp; Self-Print (Local/Africa)</div>
                 <div><strong>Webhook Callback Route:</strong> <code>/api/webhooks/prodigi</code></div>
               </div>
             </div>
